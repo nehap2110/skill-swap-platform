@@ -131,8 +131,8 @@ const getMatches = async (req, res, next) => {
 
     const [matches, total] = await Promise.all([
       User.find(query)
-        .populate('skillsOffered', 'title category level')
-        .populate('skillsWanted',  'title category level')
+        .populate('skillsOffered', 'name title category level')
+        .populate('skillsWanted',  'name title category level')
         .sort({ rating: -1, reviewCount: -1 })
         .skip(skip)
         .limit(limit)
@@ -143,6 +143,23 @@ const getMatches = async (req, res, next) => {
     return sendSuccess(res, {
       data: {
         matches: matches.map((u) => u.publicProfile),
+//         matches: matches.map((u) => {
+//   const theyOffer = u.skillsOffered.filter(skill =>
+//     me.skillsWanted.includes(skill._id.toString())
+//   )
+
+//   const theyWant = u.skillsWanted.filter(skill =>
+//     me.skillsOffered.includes(skill._id.toString())
+//   )
+
+//   return {
+//     user: u.publicProfile,
+//     matchedSkills: {
+//       theyOffer,
+//       theyWant
+//     }
+//   }
+// }),
         pagination: {
           total,
           page,

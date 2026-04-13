@@ -13,8 +13,8 @@ const withFullDetails = (query) =>
   query
     .populate('sender',       'name avatar rating reviewCount')
     .populate('receiver',     'name avatar rating reviewCount')
-    .populate('offeredSkill', 'title category level')
-    .populate('wantedSkill',  'title category level');
+    .populate('offeredSkill', 'name title category level')
+    .populate('wantedSkill',  'name title category level');
 
 // ─── POST /api/swaps — send a swap request ────────────────────────────────────
 const sendSwapRequest = async (req, res, next) => {

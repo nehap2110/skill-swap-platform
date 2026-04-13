@@ -1,0 +1,41 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  *, *::before, *::after { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; background: #f4f4f6; color: #0f1117; font-family: 'Outfit', sans-serif; -webkit-font-smoothing: antialiased; }
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #c9cad5; border-radius: 99px; }
+  ::-webkit-scrollbar-thumb:hover { background: #16a579; }
+}
+
+@layer components {
+  /* Buttons */
+  .btn        { @apply inline-flex items-center justify-center gap-2 font-medium text-sm transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none select-none; }
+  .btn-sm     { @apply btn px-3.5 py-1.5 rounded-lg text-xs; }
+  .btn-md     { @apply btn px-5 py-2.5 rounded-xl; }
+  .btn-lg     { @apply btn px-6 py-3 rounded-xl text-base; }
+  .btn-jade   { @apply bg-jade-500 text-white hover:bg-jade-600 active:bg-jade-700 focus-visible:ring-jade-400 shadow-sm hover:shadow; }
+  .btn-ink    { @apply bg-ink-900 text-white hover:bg-ink-800 active:bg-ink-700 focus-visible:ring-ink-400 shadow-sm hover:shadow; }
+  .btn-ghost  { @apply bg-transparent text-ink-700 hover:bg-ink-100 active:bg-ink-200 focus-visible:ring-ink-300; }
+  .btn-danger { @apply bg-rose-50 text-rose-600 hover:bg-rose-100 active:bg-rose-200 focus-visible:ring-rose-400 border border-rose-200; }
+  .btn-outline { @apply bg-white border border-ink-200 text-ink-700 hover:bg-ink-50 active:bg-ink-100 focus-visible:ring-ink-300 shadow-sm; }
+  /* Inputs */
+  .input      { @apply w-full rounded-xl border border-ink-200 bg-white px-4 py-2.5 text-sm text-ink-900 placeholder:text-ink-300 focus:outline-none focus:ring-2 focus:ring-jade-400 focus:border-transparent transition-all duration-150 disabled:bg-ink-50 disabled:cursor-not-allowed; }
+  .label      { @apply block text-sm font-medium text-ink-700 mb-1.5; }
+  /* Card */
+  .card       { @apply bg-white rounded-2xl border border-ink-100 shadow-card; }
+  /* Badge */
+  .badge      { @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium; }
+  /* Shimmer */
+  .shimmer    { @apply animate-shimmer bg-gradient-to-r from-ink-100 via-ink-50 to-ink-100 bg-[length:200%_100%]; }
+}
+
+@layer utilities {
+  .text-balance { text-wrap: balance; }
+  .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+  .scrollbar-hide::-webkit-scrollbar { display: none; }
+}
