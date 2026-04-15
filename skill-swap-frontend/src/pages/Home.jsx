@@ -425,7 +425,7 @@ export default function Home() {
           <Section>
             <FadeUp className="text-center mb-16">
               <p className="text-jade-400 text-xs font-bold uppercase tracking-[0.2em] mb-4">How it works</p>
-              <h2 className="font-display text-5xl font-bold text-white leading-tight">
+              <h2 className="font-display text-5xl font-bold text-gray-400 leading-tight">
                 From zero to swap<br />
                 <span className="text-ink-400">in four steps</span>
               </h2>
@@ -461,7 +461,7 @@ export default function Home() {
             <div className="grid lg:grid-cols-2 gap-16 items-center">
               <FadeUp>
                 <p className="text-jade-400 text-xs font-bold uppercase tracking-[0.2em] mb-4">Platform features</p>
-                <h2 className="font-display text-5xl font-bold text-white leading-tight mb-6">
+                <h2 className="font-display text-5xl font-bold text-ink-400 leading-tight mb-6">
                   Built for real{' '}
                   <span className="text-ink-400">knowledge exchange</span>
                 </h2>
@@ -502,7 +502,7 @@ export default function Home() {
           <Section>
             <FadeUp className="text-center mb-16">
               <p className="text-jade-400 text-xs font-bold uppercase tracking-[0.2em] mb-4">Community stories</p>
-              <h2 className="font-display text-5xl font-bold text-white">
+              <h2 className="font-display text-5xl font-bold text-ink-400">
                 Real swaps,{' '}
                 <span className="text-ink-400">real results</span>
               </h2>
