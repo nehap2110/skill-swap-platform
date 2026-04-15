@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState ,useEffect} from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { extractError } from '../services/api'
@@ -6,7 +6,7 @@ import Button from '../components/Button'
 import ErrorAlert from '../components/ErrorAlert'
 
 export default function Login() {
-  const { login, user } = useAuth()
+  const { login, user ,refreshUser} = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const from = location.state?.from?.pathname || '/'
@@ -16,7 +16,16 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
   const [showPw, setShowPw]   = useState(false)
 
-  if (user) { navigate(from, { replace: true }); return null }
+  //if (user) { navigate(from, { replace: true }); return null }
+
+  useEffect(() => {
+  if (user) {
+    navigate(from, { replace: true });
+    
+  }
+}, [user])
+
+  
 
   const handle = (e) => { setError(''); setForm(f => ({ ...f, [e.target.name]: e.target.value })) }
 
@@ -24,6 +33,9 @@ export default function Login() {
     e.preventDefault(); setError(''); setLoading(true)
     try {
       await login(form.email, form.password)
+      await refreshUser()
+
+      
       navigate(from, { replace: true })
     } catch (err) { setError(extractError(err)) }
     finally { setLoading(false) }

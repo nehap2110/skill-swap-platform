@@ -14,11 +14,20 @@
  * that's what's stored. The populate projection 'title' selects a non-existent
  * field and returns undefined — so we must check name → title → _id.
  */
+// export function skillName(skill) {
+//   if (!skill) return '—'
+//   if (typeof skill === 'string') return skill.length === 24 ? `ID:${skill.slice(-4)}` : skill
+//   return skill.name || skill.title || String(skill._id || skill.id || '—')
+// }
+
 export function skillName(skill) {
   if (!skill) return '—'
   if (typeof skill === 'string') return skill.length === 24 ? `ID:${skill.slice(-4)}` : skill
-  return skill.name || skill.title || String(skill._id || skill.id || '—')
+  return skill.name 
 }
+
+
+
 
 /**
  * Safely get a skill's _id string regardless of object vs string form.

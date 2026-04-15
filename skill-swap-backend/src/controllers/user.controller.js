@@ -7,8 +7,8 @@ const { sendSuccess } = require('../utils/apiResponse');
 const getUserById = async (req, res, next) => {
   try {
     const user = await User.findById(req.params.id)
-      .populate('skillsOffered', 'title category level tags')
-      .populate('skillsWanted',  'title category level tags');
+      .populate('skillsOffered', 'name title category level tags')
+      .populate('skillsWanted',  'name title category level tags');
 
     if (!user || !user.isActive) {
       return next(new AppError('User not found.', 404));
@@ -24,7 +24,7 @@ const getUserById = async (req, res, next) => {
 const updateMe = async (req, res, next) => {
   try {
     // Fields the user is allowed to update via this endpoint
-   // const ALLOWED = ['name', 'bio', 'location', 'avatar', 'socialLinks'];
+
    const ALLOWED = [
   'name',
   'bio',
@@ -44,8 +44,8 @@ const updateMe = async (req, res, next) => {
       { $set: updates },
       { new: true, runValidators: true }
     )
-      .populate('skillsOffered', 'title category level')
-      .populate('skillsWanted',  'title category level');
+      .populate('skillsOffered', 'name title category level')
+      .populate('skillsWanted',  'name title category level');
 
     return sendSuccess(res, { message: 'Profile updated.', data: user.publicProfile });
   } catch (err) {
@@ -143,23 +143,7 @@ const getMatches = async (req, res, next) => {
     return sendSuccess(res, {
       data: {
         matches: matches.map((u) => u.publicProfile),
-//         matches: matches.map((u) => {
-//   const theyOffer = u.skillsOffered.filter(skill =>
-//     me.skillsWanted.includes(skill._id.toString())
-//   )
 
-//   const theyWant = u.skillsWanted.filter(skill =>
-//     me.skillsOffered.includes(skill._id.toString())
-//   )
-
-//   return {
-//     user: u.publicProfile,
-//     matchedSkills: {
-//       theyOffer,
-//       theyWant
-//     }
-//   }
-// }),
         pagination: {
           total,
           page,

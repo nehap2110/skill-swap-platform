@@ -15,104 +15,10 @@ const withDetails = (query) =>
     .populate('reviewee', 'name avatar')
     .populate('swap',     'offeredSkill wantedSkill completedAt');
 
-// ─── POST /api/reviews — create a review ─────────────────────────────────────
-// const createReview = async (req, res, next) => {
-//   const session = await mongoose.startSession();
-//   session.startTransaction();
-
-//   try {
-//     const reviewerId = req.user._id;
-//     const { swapId, rating, comment } = req.body;
-
-//     // ── Guard 1: swap must exist ──────────────────────────────────────────────
-//     const swap = await SwapRequest.findById(swapId).session(session);
-//     if (!swap) {
-//       await session.abortTransaction();
-//       return next(new AppError('Swap request not found.', 404));
-//     }
-
-//     // ── Guard 2: swap must be completed ──────────────────────────────────────
-//     if (swap.status !== SWAP_STATUS.COMPLETED) {
-//       await session.abortTransaction();
-//       return sendError(res, {
-//         statusCode: 400,
-//         message: `Reviews can only be submitted for completed swaps. This swap is '${swap.status}'.`,
-//       });
-//     }
-
-//     // ── Guard 3: reviewer must be a party to the swap ─────────────────────────
-//     const isSender   = swap.sender.toString()   === reviewerId.toString();
-//     const isReceiver = swap.receiver.toString() === reviewerId.toString();
-
-//     if (!isSender && !isReceiver) {
-//       await session.abortTransaction();
-//       return next(new AppError('You are not a party to this swap.', 403));
-//     }
-
-//     // ── Guard 4: reviewer has not already reviewed this swap ──────────────────
-//     // Determine which flag to check based on the reviewer's role in the swap
-//     const alreadyReviewed = isSender ? swap.senderReviewed : swap.receiverReviewed;
-//     if (alreadyReviewed) {
-//       await session.abortTransaction();
-//       return sendError(res, {
-//         statusCode: 409,
-//         message: 'You have already submitted a review for this swap.',
-//       });
-//     }
-
-//     // Reviewee is the other party
-//     const revieweeId = isSender ? swap.receiver : swap.sender;
-
-//     // ── Create the review ─────────────────────────────────────────────────────
-//     const [review] = await Review.create(
-//       [{ swap: swapId, reviewer: reviewerId, reviewee: revieweeId, rating, comment: comment || '' }],
-//       { session }
-//     );
-
-//     // ── Mark the swap so the same party cannot review again ───────────────────
-//     const swapUpdate = isSender
-//       ? { senderReviewed: true }
-//       : { receiverReviewed: true };
-
-//     await SwapRequest.findByIdAndUpdate(swapId, swapUpdate, { session });
-
-//     await session.commitTransaction();
-
-//     // ── Trigger rating recalculation (outside transaction — non-critical) ──────
-//     // The post('save') hook fires after commitTransaction; this is a belt-and-
-//     // suspenders call in case the hook doesn't fire in all Mongoose versions.
-//     try {
-//       await User.recalculateRating(revieweeId);
-//     } catch (ratingErr) {
-//       console.error('Rating recalculation warning:', ratingErr.message);
-//     }
-
-//     const populated = await withDetails(Review.findById(review._id));
-
-//     return sendSuccess(res, {
-//       statusCode: 201,
-//       message: 'Review submitted successfully.',
-//       data: { review: populated },
-//     });
-//   } catch (err) {
-//     await session.abortTransaction();
-
-//     // Mongoose unique index violation (belt-and-suspenders for the race condition)
-//     if (err.code === 11000) {
-//       return sendError(res, {
-//         statusCode: 409,
-//         message: 'You have already submitted a review for this swap.',
-//       });
-//     }
-
-//     next(err);
-//   } finally {
-//     session.endSession();
-//   }
-// };
 
 
-//added a new createreview controller by me
+
+//createreview controller 
 
 const createReview = async (req, res, next) => {
   try {

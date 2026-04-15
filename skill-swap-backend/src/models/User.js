@@ -148,24 +148,7 @@ userSchema.virtual('publicProfile').get(function () {
   };
 });
 
-// ─── Pre-save: hash password ──────────────────────────────────────────────────
-// userSchema.pre('save', async function () {
-//   // Only re-hash when password field was actually modified
-//   if (!this.isModified('password')) return next();
-
-//   const salt = await bcrypt.genSalt(12);
-//   this.password = await bcrypt.hash(this.password, salt);
-
-//   // Invalidate all refresh tokens on password change (security hygiene)
-//   if (!this.isNew) {
-//     this.passwordChangedAt = new Date();
-//     this.refreshTokens = [];
-//   }
-
-//   //next();
-// });
-
-
+// ─── Pre-save: hash password ─────────────────────────────────────────────────
 
 userSchema.pre('save', async function () {
   // Only re-hash when password field was actually modified

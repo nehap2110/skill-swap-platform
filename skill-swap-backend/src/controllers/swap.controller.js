@@ -43,11 +43,11 @@ const sendSwapRequest = async (req, res, next) => {
     // }
 
 
-    //for testing by me
+    //for testing 
     if (!offeredSkill) {
       return next(new AppError('Offered skill not found.', 404));
     }
-    //---- end by me
+    //---- end 
 
     
     if (offeredSkill.createdBy.toString() !== senderId.toString()) {
@@ -59,15 +59,13 @@ const sendSwapRequest = async (req, res, next) => {
 
     // ── Guard 4: wanted skill must belong to the receiver ─────────────────────
     const wantedSkill = await Skill.findById(wantedSkillId);
-    // if (!wantedSkill || !wantedSkill.isActive) {
-    //   return next(new AppError('Wanted skill not found.', 404));
-    // }
+   
 
-//test by me --
+//test --
      if (!wantedSkill ) {
       return next(new AppError('Wanted skill not found.', 404));
     }
-    //end by me---
+    //end 
 
 
     if (wantedSkill.createdBy.toString() !== receiverId.toString()) {
@@ -284,6 +282,45 @@ const getSwapStats = async (req, res, next) => {
   }
 };
 
+//added by me to create a google meeting
+const createMeeting = async (req, res) => {
+  try {
+    const { swapId, scheduledAt } = req.body;
+
+    const swap = await SwapRequest.findById(swapId);
+
+    if (!swap) return res.status(404).json({ message: 'Swap not found' });
+
+    // Only participants allowed
+    if (![swap.sender.toString(), swap.receiver.toString()].includes(req.user._id.toString())) {
+      return res.status(403).json({ message: 'Not allowed' });
+    }
+
+    // Google Meet link (simple random)
+    const meetingLink = `https://meet.google.com/${Math.random().toString(36).substring(2, 10)}`;
+
+    swap.meeting = {
+      link: meetingLink,
+      scheduledAt,
+      createdBy: req.user._id
+    };
+
+    await swap.save();
+
+    // 🔥 SOCKET EMIT
+const io = req.app.get('io');   // important
+io.to(swapId).emit('meetingCreated', swap.meeting);
+
+    res.json({
+      success: true,
+      meeting: swap.meeting
+    });
+
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
 module.exports = {
   sendSwapRequest,
   listSwaps,
@@ -291,4 +328,5 @@ module.exports = {
   updateSwapStatus,
   deleteSwapRequest,
   getSwapStats,
+  createMeeting
 };

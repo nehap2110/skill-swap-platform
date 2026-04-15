@@ -92,6 +92,8 @@ export default function Chat() {
   const [typingUser, setTypingUser]   = useState(null) // { name }
   const [roomJoined, setRoomJoined]   = useState(false)
   const [socketOk, setSocketOk]       = useState(false)
+  //added by now
+  const [showMeetingModal, setShowMeetingModal] = useState(false)
 
   const userId = user?._id || user?.id
 
@@ -191,6 +193,16 @@ export default function Chat() {
       }
     }
     socket.on('typing', onTyping)
+
+
+    //added by me to create a meeting
+
+    socket.on('meetingCreated', (meeting) => {
+  setSwap(prev => ({ ...prev, meeting }))
+})
+
+
+
 
     // Socket error
     const onError = (err) => {
@@ -338,15 +350,61 @@ export default function Chat() {
           </div>
         </div>
 
-        {swap?.status === 'accepted' && (
+        {/* {swap?.status === 'accepted' && (
           <div className="flex gap-1.5">
             <Link to={`/swaps`}
               className="text-xs text-ink-500 hover:text-jade-600 transition-colors font-medium px-2">
               Swaps
             </Link>
           </div>
-        )}
+        )} */}
+
+       {/* // added by now */}
+
+       {swap?.status === 'accepted' && (
+  <div className="flex gap-2 items-center">
+    
+    {/* NEW BUTTON */}
+    <Button
+      size="sm"
+      onClick={() => setShowMeetingModal(true)}
+      className="bg-jade-500 text-white"
+    >
+      📅 Meet
+    </Button>
+
+    <Link to={`/swaps`} className="text-xs text-ink-500 hover:text-jade-600">
+      Swaps
+    </Link>
+  </div>
+)}
+
+
       </div>
+
+{/* 
+      added by now */}
+
+      {swap?.meeting?.link && (
+  <div className="bg-green-50 border border-green-200 p-3 rounded-xl mb-3">
+    <p className="text-sm font-medium text-green-700">📅 Meeting Scheduled</p>
+
+    <p className="text-xs text-gray-500">
+      {new Date(swap.meeting.scheduledAt).toLocaleString()}
+    </p>
+
+    <a
+      href={swap.meeting.link}
+      target="_blank"
+      className="text-blue-500 underline text-sm"
+    >
+      Join Meeting
+    </a>
+  </div>
+)}
+
+
+
 
       {/* ── Messages area ── */}
       <div className="flex-1 overflow-y-auto px-4 py-4 bg-ink-50 space-y-0.5" id="msg-container">
@@ -482,6 +540,72 @@ export default function Chat() {
             <span className="text-[10px] text-amber-500">{2000 - content.length} chars left</span>
           )}
         </div>
+      </div>
+
+      {/* added by now */}
+
+      {showMeetingModal && (
+  <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+    <div className="bg-white p-6 rounded-xl w-full max-w-md">
+      <h2 className="font-bold mb-4">Schedule Meeting</h2>
+
+      <MeetingModal
+        swapId={swapId}
+        onClose={() => setShowMeetingModal(false)}
+        onCreated={(meeting) => {
+          setSwap(prev => ({ ...prev, meeting }))
+        }}
+      />
+    </div>
+  </div>
+)}
+
+
+    </div>
+  )
+}
+
+//added by now
+
+function MeetingModal({ swapId, onClose, onCreated }) {
+  const [date, setDate] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  const createMeeting = async () => {
+    if (!date) return alert("Select date/time")
+
+    setLoading(true)
+    try {
+      const res = await api.post('/swaps/meeting', {
+        swapId,
+        scheduledAt: date
+      })
+
+      onCreated(res.data.meeting)
+      onClose()
+    } catch (err) {
+      alert("Failed to create meeting")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <input
+        type="datetime-local"
+        value={date}
+        onChange={e => setDate(e.target.value)}
+        className="input"
+      />
+
+      <div className="flex gap-2">
+        <Button onClick={createMeeting} loading={loading}>
+          Create
+        </Button>
+        <Button variant="outline" onClick={onClose}>
+          Cancel
+        </Button>
       </div>
     </div>
   )

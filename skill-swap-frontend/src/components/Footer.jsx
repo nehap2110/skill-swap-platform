@@ -37,7 +37,7 @@ export default function Footer() {
           <div className="col-span-2">
             <Link to="/" className="flex items-center gap-2 mb-4">
               <div className="w-8 h-8 bg-jade-500 rounded-lg flex items-center justify-center font-display font-bold text-white text-sm">S</div>
-              <span className="font-display font-bold text-white text-xl">SkillSwap</span>
+              <span className="font-display font-bold text-jade-400 text-xl">SkillSwap</span>
             </Link>
             <p className="text-sm leading-relaxed max-w-xs text-ink-400">
               Trade your expertise for knowledge you need. No money, no barriers — just people learning from each other.
@@ -56,7 +56,7 @@ export default function Footer() {
           {/* Link columns */}
           {Object.entries(LINKS).map(([category, links]) => (
             <div key={category}>
-              <p className="text-white font-semibold text-sm mb-4">{category}</p>
+              <p className="text-gray-400 font-semibold text-sm mb-4">{category}</p>
               <ul className="space-y-2.5">
                 {links.map(({ label, to }) => (
                   <li key={label}>

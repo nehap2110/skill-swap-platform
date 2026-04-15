@@ -161,6 +161,7 @@ router.delete('/:id', protect, deleteReview);
  */
 router.get('/user/:userId', optionalAuth, listUserReviewsRules, validate, getUserReviews);
 
+
 /**
  * @route  GET /api/reviews/:id
  * @desc   Single review by ID

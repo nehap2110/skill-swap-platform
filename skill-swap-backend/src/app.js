@@ -17,7 +17,8 @@ const userRoutes   = require('./routes/user.routes');
 const swapRoutes   = require('./routes/swap.routes');
 const reviewRoutes = require('./routes/review.routes');
 const skillRoutes  = require('./routes/skill.routes');
-const chatRoutes = require('./routes/chat.routes')
+const chatRoutes = require('./routes/chat.routes');
+const contactRoutes = require('./routes/contact.routes');
 
 // ─── App init ─────────────────────────────────────────────────────────────────
 const app = express();
@@ -75,6 +76,7 @@ app.use('/api/swaps',   swapRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/skills',  skillRoutes);
 app.use("/api/chat", chatRoutes);
+app.use('/api/contact', contactRoutes);
 
 // ─── 404 handler ─────────────────────────────────────────────────────────────
 // app.all('*', (req, res) => {

@@ -9,6 +9,7 @@ const {
   updateSwapStatus,
   deleteSwapRequest,
   getSwapStats,
+  createMeeting
 } = require('../controllers/swap.controller');
 
 const { protect } = require('../middleware/auth.middleware');
@@ -76,5 +77,9 @@ router.patch('/:id/status', updateStatusRules, validate, updateSwapStatus);
  * @access Private
  */
 router.delete('/:id', deleteSwapRequest);
+
+//router add to create meeting
+
+router.post('/meeting', protect, createMeeting);
 
 module.exports = router;

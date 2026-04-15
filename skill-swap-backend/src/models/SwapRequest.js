@@ -113,7 +113,23 @@ const swapRequestSchema = new Schema(
     // ── Review tracking (set by Review model after creation) ──────────────────
     senderReviewed:   { type: Boolean, default: false },
     receiverReviewed: { type: Boolean, default: false },
+
+    //added by me to create a google meet 
+    meeting: {
+  link: String,
+  scheduledAt: Date,
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  }
+},
+
   },
+
+  
+
+
+
   {
     timestamps: true,
     toJSON:  { virtuals: true },
