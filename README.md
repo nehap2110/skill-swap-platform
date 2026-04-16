@@ -150,7 +150,8 @@ npm run dev
 
 ### Backend
 
-* Deploy using **Render / Railway**
+* Deploy using **Render**
+* https://skill-swap-platform-b7g5.onrender.com
 
 ### Database
 
