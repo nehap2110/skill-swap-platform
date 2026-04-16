@@ -159,16 +159,6 @@ npm run dev
 
 ---
 
-## 📸 Screenshots
-
-> Add more screenshots if needed
-
-*   ![Dashboard](screenshots/Dashboard.png)
-* Chat Interface ![Chat](screenshots/chat-ui.png)
-* Matching Page ![Matching](screenshots/skill-matches.png)
-
----
-
 ## 🚀 Future Improvements
 
 * 📎 File & image sharing in chat
