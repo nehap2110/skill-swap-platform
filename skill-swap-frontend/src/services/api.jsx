@@ -29,7 +29,7 @@ api.interceptors.response.use(
       isRefreshing = true
       try {
         const { data } = await axios.post(
-          `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/api/auth/refresh`,
+          `${import.meta.env.VITE_API_URL}/api/auth/refresh` || 'http://localhost:5000/api/auth/refresh',
           {},
           { withCredentials: true }
         )
