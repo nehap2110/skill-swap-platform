@@ -27,18 +27,28 @@ const app = express();
 app.use(helmet());
 
 // ─── CORS ─────────────────────────────────────────────────────────────────────
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      const allowed = [env.CLIENT_URL];
-      if (!origin || allowed.includes(origin)) return callback(null, true);
-      callback(new Error(`CORS: origin ${origin} not allowed`));
-    },
-    credentials: true, // Required for cookies
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-  })
-);
+// app.use(
+//   cors({
+//     origin: (origin, callback) => {
+//       const allowed = [env.CLIENT_URL];
+//       if (!origin || allowed.includes(origin)) return callback(null, true);
+//       callback(new Error(`CORS: origin ${origin} not allowed`));
+//     },
+//     credentials: true, // Required for cookies
+//     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+//     allowedHeaders: ['Content-Type', 'Authorization'],
+//   })
+// );
+
+//add cors by me
+app.use(cors({
+  origin: [
+    env.CLIENT_URL
+  ],
+  credentials: true
+}));
+
+
 
 // ─── Body parsing ─────────────────────────────────────────────────────────────
 app.use(express.json({ limit: '10kb' }));        // Reject oversized payloads
