@@ -147,7 +147,7 @@ npm run dev
 ### Frontend
 
 * Deploy using **Vercel**
-
+* https://skill-swap-platform-lyart.vercel.app
 ### Backend
 
 * Deploy using **Render**
