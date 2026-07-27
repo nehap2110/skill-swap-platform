@@ -36,39 +36,40 @@ const sendSwapRequest = async (req, res, next) => {
       return next(new AppError('Receiver not found.', 404));
     }
 
-    // ── Guard 3: offered skill must belong to the sender ──────────────────────
+    // ── Guard 3: offered skill must exist ─────────────────────────────────────
     const offeredSkill = await Skill.findById(offeredSkillId);
-    // if (!offeredSkill || !offeredSkill.isActive) {
-    //   return next(new AppError('Offered skill not found.', 404));
-    // }
-
-
-    //for testing 
     if (!offeredSkill) {
       return next(new AppError('Offered skill not found.', 404));
     }
-    //---- end 
 
-    
-    if (offeredSkill.createdBy.toString() !== senderId.toString()) {
+    // ── Guard 3b: offered skill must be in the SENDER's skillsOffered list ────
+    // Ownership here is determined by User.skillsOffered, NOT Skill.createdBy.
+    // Skills are a shared catalog (any user can select an existing skill from
+    // the Skills page), so createdBy only reflects who first added the catalog
+    // entry — never who is allowed to offer it.
+    const senderOwnsOfferedSkill = req.user.skillsOffered.some(
+      (id) => id.toString() === offeredSkillId.toString()
+    );
+    if (!senderOwnsOfferedSkill) {
       return sendError(res, {
         statusCode: 403,
         message: 'You can only offer skills that belong to you.',
       });
     }
 
-    // ── Guard 4: wanted skill must belong to the receiver ─────────────────────
+    // ── Guard 4: wanted skill must exist ──────────────────────────────────────
     const wantedSkill = await Skill.findById(wantedSkillId);
-   
-
-//test --
-     if (!wantedSkill ) {
+    if (!wantedSkill) {
       return next(new AppError('Wanted skill not found.', 404));
     }
-    //end 
 
-
-    if (wantedSkill.createdBy.toString() !== receiverId.toString()) {
+    // ── Guard 4b: wanted skill must be in the RECEIVER's skillsOffered list ───
+    // The "wanted" skill on this request is a skill the receiver teaches, so it
+    // must appear in receiver.skillsOffered — not match wantedSkill.createdBy.
+    const receiverOffersWantedSkill = receiver.skillsOffered.some(
+      (id) => id.toString() === wantedSkillId.toString()
+    );
+    if (!receiverOffersWantedSkill) {
       return sendError(res, {
         statusCode: 403,
         message: "Wanted skill must belong to the receiver's profile.",

@@ -98,6 +98,17 @@ function RequestSwapModal({ target, onClose, onSuccess }) {
 
   const targetName = target?.name || 'this user'
 
+
+  console.log("Current User:", user);
+
+console.log("My Skills:", mySkills);
+
+console.log("Selected Offered Skill:", form.offeredSkillId);
+
+console.log("Target Skills:", theirSkills);
+
+console.log("Selected Wanted Skill:", form.wantedSkillId);
+
   return (
     <form onSubmit={submit} className="space-y-4">
       {/* Target preview */}

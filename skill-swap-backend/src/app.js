@@ -47,7 +47,7 @@ app.use(helmet());
 //   ],
 //   credentials: true
 // }));
-console.log("CLIENT_URL =", env.CLIENT_URL);
+
 
 app.use(
   cors({
@@ -102,13 +102,7 @@ app.use('/api/skills',  skillRoutes);
 app.use("/api/chat", chatRoutes);
 app.use('/api/contact', contactRoutes);
 
-// ─── 404 handler ─────────────────────────────────────────────────────────────
-// app.all('*', (req, res) => {
-//   sendError(res, {
-//     statusCode: 404,
-//     message: `Route ${req.method} ${req.originalUrl} not found.`,
-//   });
-// });
+
 
 app.use((req, res) => {
   res.status(404).json({ message: "Route not found" });
