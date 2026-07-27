@@ -10,6 +10,12 @@
  *    actual Skill model field is 'name' — handle both.
  * 4. RequestSwapModal: offeredSkill MUST belong to current user,
  *    wantedSkill MUST belong to receiver. Fetch separately.
+ * 5. Ownership for swap selection = membership in skillsOffered (the
+ *    profile list from the Skills page), NOT Skill.createdBy. Both
+ *    user.skillsOffered and target.skillsOffered are already populated,
+ *    so we source the modal's dropdowns straight from those — no more
+ *    filtering the whole /skills catalog by createdBy, which incorrectly
+ *    rejected skills a user selected but didn't personally create.
  */
 import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
@@ -45,44 +51,25 @@ function RequestSwapModal({ target, onClose, onSuccess }) {
   const [error, setError]   = useState('')
 
   useEffect(() => {
-    const fetchSkills = async () => {
-      setLoadingSkills(true)
-      try {
-        // Fetch all skills, then filter by createdBy
-        const { data } = await api.get('/skills')
-        const all = data.data?.skills || []
+    // Ownership is membership in `skillsOffered` (what the user selected on
+    // their profile via the Skills page) — NOT Skill.createdBy. Both sides
+    // are already populated skill objects on `user` / `target`, so no extra
+    // API call is needed here.
+    setLoadingSkills(true)
+    const mine = (user?.skillsOffered || []).map(s => ({
+      _id:  skillId(s),
+      name: skillName(s),
+    })).filter(s => s._id)
 
-        // Skills created by me
-        const mine  = all.filter(s => {
-          const creator = s.createdBy?._id || s.createdBy?.id || s.createdBy
-          return String(creator) === String(userId)
-        })
+    const theirs = (target?.skillsOffered || []).map(s => ({
+      _id:  skillId(s),
+      name: skillName(s),
+    })).filter(s => s._id)
 
-        // Skills created by receiver — use their profile's skillsOffered if available
-        // since the user may have selected skills from the platform list
-        const targetId = target?.id || target?._id
-        const theirOwned = all.filter(s => {
-          const creator = s.createdBy?._id || s.createdBy?.id || s.createdBy
-          return String(creator) === String(targetId)
-        })
-
-        // Fallback: use target.skillsOffered if we can't determine ownership
-        const theirOffered = (target?.skillsOffered || []).map(s => ({
-          _id:  skillId(s),
-          name: skillName(s),
-        })).filter(s => s._id)
-
-        setMySkills(mine)
-        // Prefer owned skills, fallback to skillsOffered from profile
-        setTheirSkills(theirOwned.length > 0 ? theirOwned : theirOffered)
-      } catch (err) {
-        setError(extractError(err))
-      } finally {
-        setLoadingSkills(false)
-      }
-    }
-    fetchSkills()
-  }, [userId, target])
+    setMySkills(mine)
+    setTheirSkills(theirs)
+    setLoadingSkills(false)
+  }, [userId, user, target])
 
   const submit = async (e) => {
     e.preventDefault()

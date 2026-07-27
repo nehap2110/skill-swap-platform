@@ -40,13 +40,27 @@ app.use(helmet());
 //   })
 // );
 
-//add cors by me
-app.use(cors({
-  origin: [
-    env.CLIENT_URL
-  ],
-  credentials: true
-}));
+// //add cors by me
+// app.use(cors({
+//   origin: [
+//     env.CLIENT_URL
+//   ],
+//   credentials: true
+// }));
+console.log("CLIENT_URL =", env.CLIENT_URL);
+
+app.use(
+  cors({
+    origin: [
+      "http://localhost:5173",
+      "https://skill-swap-platform-lyart.vercel.app",
+    ],
+    credentials: true,
+  })
+);
+
+
+
 
 
 
