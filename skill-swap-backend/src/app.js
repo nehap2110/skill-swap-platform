@@ -6,7 +6,6 @@ const morgan  = require('morgan');
 const compression = require('compression');
 const cookieParser = require('cookie-parser');
 const rateLimit = require('express-rate-limit');
-require('dotenv').config()
 
 const env = require('./config/env');
 const { errorHandler } = require('./middleware/errorHandler');
@@ -29,7 +28,7 @@ const app = express();
 app.use(helmet());
 
 
-const allowedOrigins = process.env.CLIENT_URL
+const allowedOrigins = env.CLIENT_URL
   .split(',')
   .map(origin => origin.trim());
 

@@ -1,4 +1,5 @@
-// src/config/env.js
+require('dotenv').config();
+
 const required = (key) => {
   const val = process.env[key];
   if (!val) throw new Error(`Missing required environment variable: ${key}`);
