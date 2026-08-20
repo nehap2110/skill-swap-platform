@@ -1,13 +1,4 @@
-/**
- * Skills.jsx
- *
- * Bug fixes applied:
- * 1. skillsOffered/skillsWanted IDs vs objects: use skillName() and skillId() everywhere.
- * 2. When saving to profile: send array of ID strings (not objects).
- * 3. Skill search: debounced, uses ?search= param.
- * 4. Profile skill update response is publicProfile — update state from it.
- * 5. "Objects not valid as React child" — guard all skill renders with skillName().
- */
+
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext'
 import api, { extractError } from '../services/api'

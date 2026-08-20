@@ -113,6 +113,17 @@ const userSchema = new Schema(
       type: Date,
       select: false,
     },
+
+    // ── Google Meet integration ───────────────────────────────────
+    // Populated once the user completes the Google OAuth consent flow.
+    // Required to generate real Google Meet links for swap sessions.
+    google: {
+      email:        { type: String, select: false },
+      accessToken:  { type: String, select: false },
+      refreshToken: { type: String, select: false },
+      expiryDate:   { type: Number, select: false }, // ms epoch
+      connectedAt:  { type: Date,   select: false },
+    },
   },
   {
     timestamps: true, // adds createdAt / updatedAt
@@ -145,6 +156,7 @@ userSchema.virtual('publicProfile').get(function () {
     reviewCount:   this.reviewCount,
     isVerified:    this.isVerified,
     createdAt:     this.createdAt,
+    googleConnected: !!this.google?.refreshToken,
   };
 });
 

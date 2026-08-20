@@ -6,6 +6,7 @@ const morgan  = require('morgan');
 const compression = require('compression');
 const cookieParser = require('cookie-parser');
 const rateLimit = require('express-rate-limit');
+require('dotenv').config()
 
 const env = require('./config/env');
 const { errorHandler } = require('./middleware/errorHandler');
@@ -19,6 +20,7 @@ const reviewRoutes = require('./routes/review.routes');
 const skillRoutes  = require('./routes/skill.routes');
 const chatRoutes = require('./routes/chat.routes');
 const contactRoutes = require('./routes/contact.routes');
+const googleRoutes = require('./routes/google.routes');
 
 // ─── App init ─────────────────────────────────────────────────────────────────
 const app = express();
@@ -26,43 +28,19 @@ const app = express();
 // ─── Security headers ─────────────────────────────────────────────────────────
 app.use(helmet());
 
-// ─── CORS ─────────────────────────────────────────────────────────────────────
-// app.use(
-//   cors({
-//     origin: (origin, callback) => {
-//       const allowed = [env.CLIENT_URL];
-//       if (!origin || allowed.includes(origin)) return callback(null, true);
-//       callback(new Error(`CORS: origin ${origin} not allowed`));
-//     },
-//     credentials: true, // Required for cookies
-//     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-//     allowedHeaders: ['Content-Type', 'Authorization'],
-//   })
-// );
 
-// //add cors by me
-// app.use(cors({
-//   origin: [
-//     env.CLIENT_URL
-//   ],
-//   credentials: true
-// }));
-
+const allowedOrigins = process.env.CLIENT_URL
+  .split(',')
+  .map(origin => origin.trim());
 
 app.use(
   cors({
-    origin: [
-      "http://localhost:5173",
-      "https://skill-swap-platform-lyart.vercel.app",
-    ],
+    origin: allowedOrigins,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
     credentials: true,
   })
 );
-
-
-
-
-
 
 // ─── Body parsing ─────────────────────────────────────────────────────────────
 app.use(express.json({ limit: '10kb' }));        // Reject oversized payloads
@@ -101,6 +79,7 @@ app.use('/api/reviews', reviewRoutes);
 app.use('/api/skills',  skillRoutes);
 app.use("/api/chat", chatRoutes);
 app.use('/api/contact', contactRoutes);
+app.use('/api/google', googleRoutes);
 
 
 

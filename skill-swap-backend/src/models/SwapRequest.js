@@ -114,15 +114,19 @@ const swapRequestSchema = new Schema(
     senderReviewed:   { type: Boolean, default: false },
     receiverReviewed: { type: Boolean, default: false },
 
-    //added by me to create a google meet 
+    // Real Google Meet link, created via the official Google Meet REST API
+    // (spaces.create — see swap.controller.js#createMeeting). `spaceName` is
+    // Google's Meet space identifier (e.g. "spaces/abcd-efgh"), kept for
+    // reference only; the Meet API has no scheduling/cancel-event concept.
     meeting: {
-  link: String,
-  scheduledAt: Date,
-  createdBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
-  }
-},
+      link:        String,
+      spaceName:   String,
+      scheduledAt: Date,
+      createdBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+      },
+    },
 
   },
 

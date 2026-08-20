@@ -31,6 +31,13 @@ const env = {
   // Password reset
   RESET_TOKEN_EXPIRES_MINUTES: parseInt(optional('RESET_TOKEN_EXPIRES_MINUTES', '15'), 10),
 
+  // Google OAuth — used to create real Google Meet links via the official Google Meet REST API (spaces.create).
+  // A user must connect their Google account (GET /api/google/auth-url) before
+  // they can generate a meeting; see src/config/googleClient.js.
+  GOOGLE_CLIENT_ID:     optional('GOOGLE_CLIENT_ID', ''),
+  GOOGLE_CLIENT_SECRET: optional('GOOGLE_CLIENT_SECRET', ''),
+  GOOGLE_REDIRECT_URI:  optional('GOOGLE_REDIRECT_URI', 'http://localhost:5000/api/google/callback'),
+
   isDev:  (process.env.NODE_ENV || 'development') === 'development',
   isProd: process.env.NODE_ENV === 'production',
 };

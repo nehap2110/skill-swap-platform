@@ -1,17 +1,4 @@
-/**
- * Swaps.jsx
- *
- * Bug fixes applied:
- * 1. isMine: swap.sender is a populated object → check both .id and ._id vs userId
- * 2. skillName: populated as 'title category level' but Skill stores 'name'.
- *    Use skillName() utility which checks name → title → id.
- * 3. PATCH /swaps/:id/status correct — was already correct.
- * 4. Tab counts from GET /swaps/stats (already correct).
- * 5. canCancelActive: only the current user who accepted can cancel an active swap;
- *    actually EITHER party can cancel an accepted swap per backend transition rules.
- * 6. senderReviewed / receiverReviewed: these come back on the swap doc from GET /swaps/:id
- *    but NOT necessarily from GET /swaps list. Guard safely.
- */
+
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
@@ -25,6 +12,7 @@ import Avatar from '../components/Avatar'
 import Empty from '../components/Empty'
 import { SkeletonCard } from '../components/Skeleton'
 import { useToast, ToastContainer } from '../components/Toast'
+//import { getSwapStats } from '../../../skill-swap-backend/src/controllers/swap.controller'
 
 const TABS = [
   { key: 'all',       label: 'All',       icon: '📋' },
@@ -108,9 +96,10 @@ export default function Swaps() {
   // ── Is the current user the sender? ─────────────────────────────────────────
   // swap.sender is a populated object: { _id, name, avatar, rating, reviewCount }
   const isMine = (swap) => {
-    const senderId = swap?.sender?._id || swap?.sender?.id || swap?.sender
+   const senderId = swap?.sender?._id || swap?.sender?.id || swap?.sender
     return String(senderId) === String(userId)
   }
+
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 space-y-6 animate-fade-in">
@@ -163,19 +152,47 @@ export default function Swaps() {
       ) : (
         <div className="space-y-3">
           {swaps.map(swap => {
-            const mine  = isMine(swap)
-            const other = mine ? swap.receiver : swap.sender
-            const isActing = (s) => acting === swap._id + s
+            const mine = isMine(swap)
+             const isActing = (s) => acting === swap._id + s
 
-            // Action guards (match backend state machine)
-            const canAcceptReject  = !mine && swap.status === 'pending'
-            const canCancelPending = mine  && swap.status === 'pending'
-            const canCancel        = swap.status === 'accepted'   // either party
-            const canComplete      = swap.status === 'accepted'   // either party
-            const canDelete        = mine  && swap.status === 'pending'
-            const canChat          = swap.status === 'accepted'
-            const canReview        = swap.status === 'completed'
+           const senderId =
+           swap?.sender?._id ||
+           swap?.sender?.id ||
+           swap?.sender
 
+           const receiverId =
+           swap?.receiver?._id ||
+           swap?.receiver?.id ||
+           swap?.receiver
+
+           const isSender =
+           String(senderId) === String(userId)
+
+           const isReceiver =
+           String(receiverId) === String(userId)
+
+           const other = isSender
+           ? swap.receiver
+           : isReceiver
+           ? swap.sender
+           : null
+
+           const canAcceptReject =
+           isReceiver && swap.status === 'pending'
+
+           const canCancelPending =
+           isSender && swap.status === 'pending'
+
+           const canCancel =
+           (isSender || isReceiver) && swap.status === 'accepted'
+
+           const canComplete =
+           (isSender || isReceiver) && swap.status === 'accepted'
+
+           const canDelete  = mine  && swap.status === 'pending'
+           const canChat = swap.status === 'accepted'
+           const canReview = swap.status === 'completed'
+            
             // Has this user already reviewed?
             const alreadyReviewed = mine ? !!swap.senderReviewed : !!swap.receiverReviewed
 

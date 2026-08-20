@@ -1,13 +1,4 @@
-/**
- * Dashboard.jsx
- *
- * Bug fixes applied:
- * 1. user.publicProfile uses 'id' not '_id' — handle both.
- * 2. skillsOffered / skillsWanted may contain ObjectId strings or objects.
- *    Use skillName() utility.
- * 3. Rating display: user.rating is a Number, guard against NaN.
- * 4. Stats fetch: GET /swaps returns data.data.swaps array.
- */
+
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'

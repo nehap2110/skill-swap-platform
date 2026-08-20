@@ -5,15 +5,6 @@ const { SwapRequest, SWAP_STATUS } = require('./models/SwapRequest');
 const User = require('./models/User');
 const env = require('./config/env');
 
-/**
- * Initialises Socket.io on the provided HTTP server, attaches the instance
- * to the Express app (so controllers can emit via req.app.get('io')),
- * and registers all connection/event handlers.
- *
- * @param {import('http').Server} httpServer
- * @param {import('express').Application} app
- * @returns {import('socket.io').Server}
- */
 const initSocket = (httpServer, app) => {
   const io = new Server(httpServer, {
     cors: {

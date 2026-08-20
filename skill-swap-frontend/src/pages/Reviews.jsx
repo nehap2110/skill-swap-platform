@@ -1,14 +1,4 @@
-/**
- * Reviews.jsx
- *
- * Bug fixes applied:
- * 1. swap.sender / swap.receiver are populated objects — check both .id and ._id.
- * 2. senderReviewed / receiverReviewed: only present on detailed swap fetch (/swaps/:id).
- *    Guard with !! to safely treat undefined as false.
- * 3. skillName for offeredSkill / wantedSkill (populated as 'title category level').
- * 4. GET /reviews/user/:id — optional endpoint; don't crash if it 404s.
- * 5. Review rating must be integer 1-5.
- */
+
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'

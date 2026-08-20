@@ -1,22 +1,4 @@
-/**
- * Matches.jsx
- *
- * Bug fixes applied:
- * 1. API returns { data: { matches: publicProfile[], pagination } }
- *    publicProfile has { id, name, skillsOffered, skillsWanted, ... }
- *    NOT { user, matchedSkills } — that was the frontend's wrong assumption.
- * 2. publicProfile.id (not ._id) — use both.
- * 3. Skills are populated with 'title category level' in the query but the
- *    actual Skill model field is 'name' — handle both.
- * 4. RequestSwapModal: offeredSkill MUST belong to current user,
- *    wantedSkill MUST belong to receiver. Fetch separately.
- * 5. Ownership for swap selection = membership in skillsOffered (the
- *    profile list from the Skills page), NOT Skill.createdBy. Both
- *    user.skillsOffered and target.skillsOffered are already populated,
- *    so we source the modal's dropdowns straight from those — no more
- *    filtering the whole /skills catalog by createdBy, which incorrectly
- *    rejected skills a user selected but didn't personally create.
- */
+
 import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import api, { extractError } from '../services/api'

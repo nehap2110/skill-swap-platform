@@ -570,24 +570,80 @@ export default function Chat() {
 function MeetingModal({ swapId, onClose, onCreated }) {
   const [date, setDate] = useState('')
   const [loading, setLoading] = useState(false)
+  const [connecting, setConnecting] = useState(false)
+  const [needsGoogle, setNeedsGoogle] = useState(false)
+  const [error, setError] = useState('')
+
+  // Real Meet links come from the Calendar API, so the creator has to have
+  // linked their Google account first.
+  useEffect(() => {
+    let cancelled = false
+    api.get('/google/status')
+      .then(res => { if (!cancelled) setNeedsGoogle(!res.data?.data?.connected) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
+
+  const connectGoogle = async () => {
+    setConnecting(true)
+    setError('')
+    try {
+      const res = await api.get('/google/auth-url')
+      const url = res.data?.data?.url
+      if (url) {
+        // Open in the same tab: Google redirects back to /swaps when done,
+        // and this modal's state doesn't need to survive that round trip.
+        window.location.href = url
+      }
+    } catch (err) {
+      setError(extractError(err))
+    } finally {
+      setConnecting(false)
+    }
+  }
 
   const createMeeting = async () => {
-    if (!date) return alert("Select date/time")
+    if (!date) return setError('Select a date/time first.')
 
     setLoading(true)
+    setError('')
     try {
       const res = await api.post('/swaps/meeting', {
         swapId,
         scheduledAt: date
       })
 
-      onCreated(res.data.meeting)
+      onCreated(res.data.data.meeting)
       onClose()
     } catch (err) {
-      alert("Failed to create meeting")
+      if (err.response?.status === 428) {
+        setNeedsGoogle(true)
+      } else {
+        setError(extractError(err) || 'Failed to create meeting')
+      }
     } finally {
       setLoading(false)
     }
+  }
+
+  if (needsGoogle) {
+    return (
+      <div className="space-y-4">
+        <p className="text-sm text-ink-600">
+          Connect your Google account so SkillSwap can create a real Google Meet
+          link (via a Calendar event) for this session.
+        </p>
+        {error && <p className="text-sm text-red-600">{error}</p>}
+        <div className="flex gap-2">
+          <Button onClick={connectGoogle} loading={connecting}>
+            Connect Google Calendar
+          </Button>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -598,6 +654,7 @@ function MeetingModal({ swapId, onClose, onCreated }) {
         onChange={e => setDate(e.target.value)}
         className="input"
       />
+      {error && <p className="text-sm text-red-600">{error}</p>}
 
       <div className="flex gap-2">
         <Button onClick={createMeeting} loading={loading}>

@@ -1,11 +1,10 @@
-// src/config/db.js
+
 const mongoose = require('mongoose');
 const env = require('./env');
 
 const connectDB = async () => {
   try {
     const conn = await mongoose.connect(env.MONGO_URI, {
-      // Mongoose 8+ has sensible defaults; keep these for clarity
       serverSelectionTimeoutMS: 5000,
       socketTimeoutMS: 45000,
     });

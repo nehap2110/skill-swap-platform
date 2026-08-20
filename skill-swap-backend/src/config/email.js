@@ -1,7 +1,4 @@
-// src/config/email.js
-// Nodemailer transport factory.
-// In development without credentials, auto-creates an Ethereal test account
-// so the app boots without any config — check console for the preview URL.
+
 
 const nodemailer = require('nodemailer');
 const env        = require('./env');

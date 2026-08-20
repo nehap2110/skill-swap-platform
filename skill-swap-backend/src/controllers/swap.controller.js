@@ -1,10 +1,12 @@
 // src/controllers/swap.controller.js
 const mongoose = require('mongoose');
+const { SpacesServiceClient } = require('@google-apps/meet').v2;
 const { SwapRequest, SWAP_STATUS } = require('../models/SwapRequest');
 const Skill = require('../models/Skill');
 const User  = require('../models/User');
 const { AppError } = require('../middleware/errorHandler');
 const { sendSuccess, sendError } = require('../utils/apiResponse');
+const { getAuthorizedClientForUser } = require('../config/googleClient');
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -42,11 +44,7 @@ const sendSwapRequest = async (req, res, next) => {
       return next(new AppError('Offered skill not found.', 404));
     }
 
-    // ── Guard 3b: offered skill must be in the SENDER's skillsOffered list ────
-    // Ownership here is determined by User.skillsOffered, NOT Skill.createdBy.
-    // Skills are a shared catalog (any user can select an existing skill from
-    // the Skills page), so createdBy only reflects who first added the catalog
-    // entry — never who is allowed to offer it.
+  
     const senderOwnsOfferedSkill = req.user.skillsOffered.some(
       (id) => id.toString() === offeredSkillId.toString()
     );
@@ -63,9 +61,7 @@ const sendSwapRequest = async (req, res, next) => {
       return next(new AppError('Wanted skill not found.', 404));
     }
 
-    // ── Guard 4b: wanted skill must be in the RECEIVER's skillsOffered list ───
-    // The "wanted" skill on this request is a skill the receiver teaches, so it
-    // must appear in receiver.skillsOffered — not match wantedSkill.createdBy.
+    
     const receiverOffersWantedSkill = receiver.skillsOffered.some(
       (id) => id.toString() === wantedSkillId.toString()
     );
@@ -183,12 +179,12 @@ const getSwapById = async (req, res, next) => {
 // ─── PATCH /api/swaps/:id/status — accept / reject / complete / cancel ────────
 const updateSwapStatus = async (req, res, next) => {
   try {
-    const { status: newStatus, note } = req.body;
+    const { status: newStatus, note } = req.body; 
     const actorId = req.user._id;
 
-    // Fetch with status history for transition logic
-    const swap = await SwapRequest.findById(req.params.id)
-      .select('+statusHistory');
+   const swap = await SwapRequest.findById(req.params.id)
+  .select('+statusHistory');
+
 
     if (!swap) return next(new AppError('Swap request not found.', 404));
 
@@ -283,42 +279,91 @@ const getSwapStats = async (req, res, next) => {
   }
 };
 
-//added by me to create a google meeting
-const createMeeting = async (req, res) => {
+// ─── POST /api/swaps/meeting — create a REAL Google Meet link ────────────────
+// Uses the official Google Meet REST API (spaces.create via the
+// @google-apps/meet client library) — NOT the Calendar API. A Meet "space" is
+// created on demand and Google returns its real `meetingUri`; there is no
+// scheduling concept in the Meet API itself, so `scheduledAt` remains purely
+// app-side metadata (as it already was).
+const createMeeting = async (req, res, next) => {
   try {
     const { swapId, scheduledAt } = req.body;
 
-    const swap = await SwapRequest.findById(swapId);
-
-    if (!swap) return res.status(404).json({ message: 'Swap not found' });
-
-    // Only participants allowed
-    if (![swap.sender.toString(), swap.receiver.toString()].includes(req.user._id.toString())) {
-      return res.status(403).json({ message: 'Not allowed' });
+    if (!swapId || !scheduledAt) {
+      return sendError(res, { statusCode: 400, message: 'swapId and scheduledAt are required.' });
     }
 
-    // Google Meet link (simple random)
-    const meetingLink = `https://meet.google.com/${Math.random().toString(36).substring(2, 10)}`;
+    const startTime = new Date(scheduledAt);
+    if (Number.isNaN(startTime.getTime())) {
+      return sendError(res, { statusCode: 400, message: 'scheduledAt must be a valid date.' });
+    }
+
+    const swap = await SwapRequest.findById(swapId);
+    if (!swap) return next(new AppError('Swap request not found.', 404));
+
+    const userId = req.user._id.toString();
+    const isSender = swap.sender.toString() === userId;
+    const isReceiver = swap.receiver.toString() === userId;
+    if (!isSender && !isReceiver) {
+      return next(new AppError('You are not a party to this swap request.', 403));
+    }
+
+    // Need the creator's stored Google tokens (they're select:false by default).
+    const organizer = await User.findById(req.user._id).select(
+      '+google.refreshToken +google.accessToken +google.expiryDate'
+    );
+
+    let authClient;
+    try {
+      authClient = getAuthorizedClientForUser(organizer);
+    } catch (err) {
+      if (err.code === 'GOOGLE_NOT_CONNECTED') {
+        return sendError(res, {
+          statusCode: 428,
+          message: 'Connect your Google account before creating a meeting.',
+          errors: { code: 'GOOGLE_NOT_CONNECTED' },
+        });
+      }
+      throw err;
+    }
+
+    const meetClient = new SpacesServiceClient({ authClient });
+
+    let space;
+    try {
+      [space] = await meetClient.createSpace({});
+    } catch (err) {
+      const reason = err?.details || err?.message || 'Unknown error';
+      return sendError(res, { statusCode: 502, message: `Google Meet rejected the request: ${reason}` });
+    }
+
+    // `space.meetingUri` is Google's real, ready-to-join link — never
+    // constructed or randomized locally.
+    if (!space?.meetingUri) {
+      return sendError(res, {
+        statusCode: 502,
+        message: 'Google Meet did not return a meeting URI. Try again.',
+      });
+    }
 
     swap.meeting = {
-      link: meetingLink,
-      scheduledAt,
-      createdBy: req.user._id
+      link: space.meetingUri,
+      spaceName: space.name,       // e.g. "spaces/abcd-efgh-ijk" — Meet space id, for reference
+      scheduledAt: startTime,
+      createdBy: req.user._id,
     };
-
     await swap.save();
 
-    // 🔥 SOCKET EMIT
-const io = req.app.get('io');   // important
-io.to(swapId).emit('meetingCreated', swap.meeting);
+    const io = req.app.get('io');
+    if (io) io.to(swapId).emit('meetingCreated', swap.meeting);
 
-    res.json({
-      success: true,
-      meeting: swap.meeting
+    return sendSuccess(res, {
+      statusCode: 201,
+      message: 'Google Meet link created.',
+      data: { meeting: swap.meeting },
     });
-
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    next(err);
   }
 };
 
