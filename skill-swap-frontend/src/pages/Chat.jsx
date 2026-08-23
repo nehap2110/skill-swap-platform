@@ -92,8 +92,10 @@ export default function Chat() {
   const [typingUser, setTypingUser]   = useState(null) // { name }
   const [roomJoined, setRoomJoined]   = useState(false)
   const [socketOk, setSocketOk]       = useState(false)
-  //added by now
-  const [showMeetingModal, setShowMeetingModal] = useState(false)
+
+  // ── Google Meet creation (user-initiated) ────────────────────────────────
+  const [creatingMeeting, setCreatingMeeting] = useState(false)
+  const [meetingError, setMeetingError]       = useState('')
 
   const userId = user?._id || user?.id
 
@@ -195,13 +197,12 @@ export default function Chat() {
     socket.on('typing', onTyping)
 
 
-    //added by me to create a meeting
-
-    socket.on('meetingCreated', (meeting) => {
-  setSwap(prev => ({ ...prev, meeting }))
-})
-
-
+    // Meeting lifecycle — dedicated swap-level events so both participants'
+    // UI updates instantly without a refresh.
+    const onMeetingCreated = (meeting) => setSwap(prev => ({ ...prev, meeting }))
+    const onMeetingStatus  = (meeting) => setSwap(prev => ({ ...prev, meeting }))
+    socket.on('meeting:created', onMeetingCreated)
+    socket.on('meeting:status',  onMeetingStatus)
 
 
     // Socket error
@@ -219,11 +220,41 @@ export default function Chat() {
       socket.off('room_joined',     onRoomJoined)
       socket.off('receive_message', onReceiveMessage)
       socket.off('typing',          onTyping)
+      socket.off('meeting:created', onMeetingCreated)
+      socket.off('meeting:status',  onMeetingStatus)
       socket.off('error',           onError)
       leaveRoom(swapId)
       setRoomJoined(false)
     }
   }, [loading, pageError, swapId, scrollToBottom])
+
+  // ── Meeting status refresh (read-only — never creates a meeting) ─────────
+  // Google's own record of whether a conference is currently happening
+  // inside the space is the only thing that can tell us "active" vs "ended".
+  // We check it: (a) once when the tab regains focus/visibility — the exact
+  // moment someone is likely returning from Google Meet in the other tab —
+  // and (b) on a slow background interval as a fallback. Both just call the
+  // status endpoint; neither ever calls the create endpoint.
+  useEffect(() => {
+    if (!swap?.meeting?.spaceName || swap.meeting.status === 'ended') return
+
+    const checkStatus = () => {
+      api.get(`/swaps/${swapId}/meeting/status`)
+        .then(({ data }) => {
+          if (data.data?.meeting) setSwap(prev => ({ ...prev, meeting: data.data.meeting }))
+        })
+        .catch(() => {})
+    }
+
+    const onVisibility = () => { if (document.visibilityState === 'visible') checkStatus() }
+    document.addEventListener('visibilitychange', onVisibility)
+    const interval = setInterval(checkStatus, 30_000)
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility)
+      clearInterval(interval)
+    }
+  }, [swapId, swap?.meeting?.spaceName, swap?.meeting?.status])
 
   // ── Typing indicator emission ─────────────────────────────────────────────────
   const handleInput = (e) => {
@@ -295,6 +326,55 @@ export default function Chat() {
     }
   }
 
+  // ── Create a real Google Meet space (user-initiated) ──────────────────────
+  // Called when either party clicks "Set Up Google Meet". If the clicking
+  // user hasn't authorized Google yet, the backend replies 428 and we kick
+  // off the real OAuth2 authorization-code flow: redirect to Google's
+  // consent screen (GET /google/auth-url) → user grants access → Google
+  // redirects to our backend callback with ?code=...&state=... → backend
+  // exchanges the code for access/refresh tokens (see google.controller.js)
+  // → redirects back here with ?google=connected. The user then clicks the
+  // button again to actually create the space.
+  const handleCreateMeeting = async () => {
+    setMeetingError('')
+    setCreatingMeeting(true)
+    try {
+      const { data } = await api.post('/swaps/meeting', { swapId })
+      const meeting = data.data?.meeting
+      // The persisted 'meeting' message also arrives via the 'receive_message'
+      // socket event (since we're already joined to this room), but update
+      // local state immediately too so the banner disappears without delay.
+      setSwap(prev => ({ ...prev, meeting }))
+      // Open in a new tab, never navigate the SkillSwap tab itself away —
+      // this tab (chat) must stay open the whole time.
+      if (meeting?.link) window.open(meeting.link, '_blank', 'noopener,noreferrer')
+    } catch (err) {
+      if (err.response?.status === 428) {
+        try {
+          const authRes = await api.get('/google/auth-url')
+          const url = authRes.data?.data?.url
+          if (url) {
+            window.location.href = url
+            return
+          }
+        } catch (authErr) {
+          setMeetingError(extractError(authErr))
+        }
+      } else {
+        setMeetingError(extractError(err))
+      }
+    } finally {
+      setCreatingMeeting(false)
+    }
+  }
+
+  // Opens an existing meeting link in a new tab — used both by the "Join
+  // Meeting" card in the message feed and the "Start New Meeting" action
+  // after a previous conference has ended.
+  const openMeeting = (link) => {
+    if (link) window.open(link, '_blank', 'noopener,noreferrer')
+  }
+
   // ── Derived values ────────────────────────────────────────────────────────────
   const partner = swap
     ? ((swap.sender?._id || swap.sender?.id) === userId ? swap.receiver : swap.sender)
@@ -350,61 +430,49 @@ export default function Chat() {
           </div>
         </div>
 
-        {/* {swap?.status === 'accepted' && (
-          <div className="flex gap-1.5">
-            <Link to={`/swaps`}
-              className="text-xs text-ink-500 hover:text-jade-600 transition-colors font-medium px-2">
-              Swaps
-            </Link>
-          </div>
-        )} */}
-
-       {/* // added by now */}
-
-       {swap?.status === 'accepted' && (
-  <div className="flex gap-2 items-center">
-    
-    {/* NEW BUTTON */}
-    <Button
-      size="sm"
-      onClick={() => setShowMeetingModal(true)}
-      className="bg-jade-500 text-white"
-    >
-      📅 Meet
-    </Button>
-
-    <Link to={`/swaps`} className="text-xs text-ink-500 hover:text-jade-600">
-      Swaps
-    </Link>
-  </div>
-)}
-
+        {/* Always show a way back to the swap list once accepted */}
+        {swap?.status === 'accepted' && (
+          <Link to={`/swaps`} className="text-xs text-ink-500 hover:text-jade-600 flex-shrink-0 px-1">
+            Swaps
+          </Link>
+        )}
 
       </div>
 
-{/* 
-      added by now */}
-
-      {swap?.meeting?.link && (
-  <div className="bg-green-50 border border-green-200 p-3 rounded-xl mb-3">
-    <p className="text-sm font-medium text-green-700">📅 Meeting Scheduled</p>
-
-    <p className="text-xs text-gray-500">
-      {new Date(swap.meeting.scheduledAt).toLocaleString()}
-    </p>
-
-    <a
-      href={swap.meeting.link}
-      target="_blank"
-      className="text-blue-500 underline text-sm"
-    >
-      Join Meeting
-    </a>
-  </div>
-)}
-
-
-
+      {/* ── Meeting banner ────────────────────────────────────────────────────
+          Its own full-width banner (not a small header button) so it can't
+          get lost/hidden. Two states only appear here:
+            • no meeting yet at all           → "Start Meeting"
+            • Google reports the prior call as ended → "Start New Meeting"
+          The "meeting is ready / Join Meeting" state (STATE 2) lives on the
+          message card itself in the feed below — nothing here duplicates it. */}
+      {swap?.status === 'accepted' && (!swap?.meeting?.link || swap.meeting.status === 'ended') && (
+        <div className="px-4 py-3 bg-amber-50 border-b border-amber-200 flex-shrink-0 space-y-2">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-amber-800">
+                {swap.meeting?.status === 'ended' ? 'Meeting ended' : 'No meeting started yet'}
+              </p>
+              <p className="text-xs text-amber-700">
+                {swap.meeting?.status === 'ended'
+                  ? 'That Google Meet call has ended. Start a new one anytime.'
+                  : 'Start a real Google Meet call for this swap.'}
+              </p>
+            </div>
+            <Button
+              size="sm"
+              loading={creatingMeeting}
+              onClick={handleCreateMeeting}
+              className="bg-jade-500 text-white flex-shrink-0"
+            >
+              {swap.meeting?.status === 'ended' ? '🔁 Start New Meeting' : '▶ Start Meeting'}
+            </Button>
+          </div>
+          {meetingError && (
+            <p className="text-xs text-rose-600">{meetingError}</p>
+          )}
+        </div>
+      )}
 
       {/* ── Messages area ── */}
       <div className="flex-1 overflow-y-auto px-4 py-4 bg-ink-50 space-y-0.5" id="msg-container">
@@ -431,6 +499,29 @@ export default function Chat() {
           const sameSender = prevMsg &&
             (prevMsg.sender?._id || prevMsg.sender?.id || prevMsg.sender) ===
             (msg.sender?._id || msg.sender?.id || msg.sender)
+
+          // Meeting messages render as a distinct card, not a chat bubble.
+          // The meeting is independent of the chat: joining/ending the Meet
+          // call never touches this conversation, which keeps working
+          // normally before, during, and after the call.
+          if (msg.type === 'meeting' && msg.meta?.link) {
+            return (
+              <div key={msg._id} className="flex justify-center my-3">
+                <div className="w-full max-w-xs bg-white border border-jade-200 rounded-2xl shadow-sm p-4 text-center space-y-2">
+                  <p className="text-sm font-semibold text-ink-800">🎥 {msg.meta.title || 'Google Meet'}</p>
+                  <p className="text-xs text-ink-500">{msg.content || 'Your SkillSwap meeting is ready.'}</p>
+                  <button
+                    type="button"
+                    onClick={() => openMeeting(msg.meta.link)}
+                    className="inline-block w-full bg-jade-500 text-white text-sm font-medium rounded-xl py-2 hover:bg-jade-600 transition-colors"
+                  >
+                    Join Meeting
+                  </button>
+                  <p className="text-[10px] text-ink-300">{fmtTime(msg.createdAt)}</p>
+                </div>
+              </div>
+            )
+          }
 
           return (
             <div key={msg._id}
@@ -542,128 +633,6 @@ export default function Chat() {
         </div>
       </div>
 
-      {/* added by now */}
-
-      {showMeetingModal && (
-  <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-    <div className="bg-white p-6 rounded-xl w-full max-w-md">
-      <h2 className="font-bold mb-4">Schedule Meeting</h2>
-
-      <MeetingModal
-        swapId={swapId}
-        onClose={() => setShowMeetingModal(false)}
-        onCreated={(meeting) => {
-          setSwap(prev => ({ ...prev, meeting }))
-        }}
-      />
-    </div>
-  </div>
-)}
-
-
-    </div>
-  )
-}
-
-//added by now
-
-function MeetingModal({ swapId, onClose, onCreated }) {
-  const [date, setDate] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [connecting, setConnecting] = useState(false)
-  const [needsGoogle, setNeedsGoogle] = useState(false)
-  const [error, setError] = useState('')
-
-  // Real Meet links come from the Calendar API, so the creator has to have
-  // linked their Google account first.
-  useEffect(() => {
-    let cancelled = false
-    api.get('/google/status')
-      .then(res => { if (!cancelled) setNeedsGoogle(!res.data?.data?.connected) })
-      .catch(() => {})
-    return () => { cancelled = true }
-  }, [])
-
-  const connectGoogle = async () => {
-    setConnecting(true)
-    setError('')
-    try {
-      const res = await api.get('/google/auth-url')
-      const url = res.data?.data?.url
-      if (url) {
-        // Open in the same tab: Google redirects back to /swaps when done,
-        // and this modal's state doesn't need to survive that round trip.
-        window.location.href = url
-      }
-    } catch (err) {
-      setError(extractError(err))
-    } finally {
-      setConnecting(false)
-    }
-  }
-
-  const createMeeting = async () => {
-    if (!date) return setError('Select a date/time first.')
-
-    setLoading(true)
-    setError('')
-    try {
-      const res = await api.post('/swaps/meeting', {
-        swapId,
-        scheduledAt: date
-      })
-
-      onCreated(res.data.data.meeting)
-      onClose()
-    } catch (err) {
-      if (err.response?.status === 428) {
-        setNeedsGoogle(true)
-      } else {
-        setError(extractError(err) || 'Failed to create meeting')
-      }
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  if (needsGoogle) {
-    return (
-      <div className="space-y-4">
-        <p className="text-sm text-ink-600">
-          Connect your Google account so SkillSwap can create a real Google Meet
-          link (via a Calendar event) for this session.
-        </p>
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <div className="flex gap-2">
-          <Button onClick={connectGoogle} loading={connecting}>
-            Connect Google Calendar
-          </Button>
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="space-y-4">
-      <input
-        type="datetime-local"
-        value={date}
-        onChange={e => setDate(e.target.value)}
-        className="input"
-      />
-      {error && <p className="text-sm text-red-600">{error}</p>}
-
-      <div className="flex gap-2">
-        <Button onClick={createMeeting} loading={loading}>
-          Create
-        </Button>
-        <Button variant="outline" onClick={onClose}>
-          Cancel
-        </Button>
-      </div>
     </div>
   )
 }

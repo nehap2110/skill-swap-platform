@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
@@ -66,8 +65,14 @@ export default function Swaps() {
   const act = async (id, status, successMsg) => {
     setActing(id + status)
     try {
-      await api.patch(`/swaps/${id}/status`, { status })
+      const { data } = await api.patch(`/swaps/${id}/status`, { status })
       toast(successMsg)
+      // On acceptance the backend tries to auto-create a real Google Meet
+      // link; if that couldn't happen (e.g. Google not connected yet) it
+      // still accepts the swap and tells us here instead of failing silently.
+      if (data?.data?.meetingWarning) {
+        toast(data.data.meetingWarning, 'warning')
+      }
       await fetchSwaps()
       // Refresh counts
       api.get('/swaps/stats').then(({ data }) => setCounts(data.data?.stats || {})).catch(() => {})

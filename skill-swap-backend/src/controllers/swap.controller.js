@@ -18,6 +18,110 @@ const withFullDetails = (query) =>
     .populate('offeredSkill', 'name title category level')
     .populate('wantedSkill',  'name title category level');
 
+// ─── Helper: create a REAL Google Meet space via the official Meet API ───────
+// Called only when a party explicitly clicks "Start Meeting" in the chat
+// (POST /api/swaps/meeting, below). Never fabricates a URL — either returns
+// Google's real `meetingUri` or throws.
+const createGoogleMeetSpace = async (actorUserId) => {
+  // Google tokens are select:false by default — fetch them explicitly.
+  const organizer = await User.findById(actorUserId).select(
+    '+google.refreshToken +google.accessToken +google.expiryDate'
+  );
+
+  // Throws { code: 'GOOGLE_NOT_CONNECTED', statusCode: 428 } if not connected.
+  const authClient = getAuthorizedClientForUser(organizer);
+
+  const meetClient = new SpacesServiceClient({ authClient });
+
+  let space;
+  try {
+    [space] = await meetClient.createSpace({});
+  } catch (err) {
+    const apiErr = new Error(err?.details || err?.message || 'Unknown error');
+    apiErr.statusCode = 502;
+    throw apiErr;
+  }
+
+  if (!space?.meetingUri) {
+    const err = new Error('Google Meet did not return a meeting URI.');
+    err.statusCode = 502;
+    throw err;
+  }
+
+  return { link: space.meetingUri, spaceName: space.name };
+};
+
+// ─── Helper: read the REAL current state of an existing space ───────────────
+// A Meet *space* (the link) and the *conference* happening inside it are
+// different things — a space can exist with nobody in it. Google's
+// `spaces.get` returns `activeConference` only while people are actually in
+// a call right now, so that's the only signal we treat as ground truth:
+//   activeConference present     → 'active'
+//   absent, but was seen before  → 'ended'
+//   absent, never seen before    → 'ready'
+// This never invents an "ended" status — if the Google call itself fails
+// (e.g. organizer's token expired), the caller keeps whatever status was
+// last persisted rather than guessing.
+const readGoogleMeetSpaceStatus = async (organizerUserId, spaceName) => {
+  const organizer = await User.findById(organizerUserId).select(
+    '+google.refreshToken +google.accessToken +google.expiryDate'
+  );
+  const authClient = getAuthorizedClientForUser(organizer);
+  const meetClient = new SpacesServiceClient({ authClient });
+
+  const [space] = await meetClient.getSpace({ name: spaceName });
+  return { isActive: !!space?.activeConference };
+};
+
+// ─── Helper: persist the meeting + announce it as a chat message ────────────
+// Saves the real meeting on the swap, creates a persisted `meeting`-type
+// Message (so it's still there next time the chat is opened), and emits both
+// `receive_message` (so it renders inline in the existing chat feed, exactly
+// like a normal message) and `meeting:created` (a dedicated swap-level event
+// the other participant's chat listens for, so its UI updates immediately
+// without a page refresh) to the swap's Socket.io room.
+const announceMeeting = async ({ swap, meetingData, actorId, io }) => {
+  swap.meeting = {
+    link:        meetingData.link,
+    spaceName:   meetingData.spaceName,
+    scheduledAt: meetingData.scheduledAt || new Date(),
+    status:      'ready',   // space just created — no conference joined yet
+    everActive:  false,
+    endedAt:     undefined,
+    createdBy:   actorId,
+  };
+  await swap.save();
+
+  const Message = require('../models/Message');
+  const actorIdStr   = actorId.toString();
+  const otherPartyId = swap.sender.toString() === actorIdStr ? swap.receiver : swap.sender;
+
+  const message = await Message.create({
+    swap:     swap._id,
+    sender:   actorId,
+    receiver: otherPartyId,
+    type:     'meeting',
+    content:  'Your SkillSwap meeting is ready.',
+    meta: {
+      link:      meetingData.link,
+      meetingId: meetingData.spaceName,
+      title:     'Google Meet',
+    },
+  });
+
+  const populatedMessage = await Message.findById(message._id)
+    .populate('sender',   'name avatar')
+    .populate('receiver', 'name avatar');
+
+  if (io) {
+    const room = swap._id.toString();
+    io.to(room).emit('receive_message', { success: true, data: { message: populatedMessage } });
+    io.to(room).emit('meeting:created', swap.meeting);
+  }
+
+  return swap.meeting;
+};
+
 // ─── POST /api/swaps — send a swap request ────────────────────────────────────
 const sendSwapRequest = async (req, res, next) => {
   try {
@@ -198,6 +302,9 @@ const updateSwapStatus = async (req, res, next) => {
     // Delegate all transition logic + actor enforcement to the model method
     await swap.transition(newStatus, actorId, note || '');
 
+    // Meeting creation is deliberately NOT automatic — it stays a separate,
+    // explicit action a party takes from the chat once both sides are ready
+    // (see createMeeting below). Accepting a swap only unlocks the chat.
     const updated = await withFullDetails(SwapRequest.findById(swap._id));
 
     const messages = {
@@ -280,22 +387,29 @@ const getSwapStats = async (req, res, next) => {
 };
 
 // ─── POST /api/swaps/meeting — create a REAL Google Meet link ────────────────
-// Uses the official Google Meet REST API (spaces.create via the
-// @google-apps/meet client library) — NOT the Calendar API. A Meet "space" is
-// created on demand and Google returns its real `meetingUri`; there is no
-// scheduling concept in the Meet API itself, so `scheduledAt` remains purely
-// app-side metadata (as it already was).
+// User-initiated ONLY: a party clicks "Start Meeting" in the chat once the
+// swap is accepted. Nothing else in the app calls this — not loading the
+// chat, not loading messages, not loading the swap, not fetching meeting
+// status, not a page refresh. Uses the official Google Meet REST API
+// (spaces.create via the @google-apps/meet client library) — NOT the
+// Calendar API — and the clicking user's own OAuth-authorized Google account
+// as the space's organizer. Never fabricates a URL: this either returns
+// Google's real `meetingUri` or a clear error (missing Google auth / API
+// failure).
 const createMeeting = async (req, res, next) => {
   try {
     const { swapId, scheduledAt } = req.body;
 
-    if (!swapId || !scheduledAt) {
-      return sendError(res, { statusCode: 400, message: 'swapId and scheduledAt are required.' });
+    if (!swapId) {
+      return sendError(res, { statusCode: 400, message: 'swapId is required.' });
     }
 
-    const startTime = new Date(scheduledAt);
-    if (Number.isNaN(startTime.getTime())) {
-      return sendError(res, { statusCode: 400, message: 'scheduledAt must be a valid date.' });
+    let startTime;
+    if (scheduledAt) {
+      startTime = new Date(scheduledAt);
+      if (Number.isNaN(startTime.getTime())) {
+        return sendError(res, { statusCode: 400, message: 'scheduledAt must be a valid date.' });
+      }
     }
 
     const swap = await SwapRequest.findById(swapId);
@@ -308,14 +422,28 @@ const createMeeting = async (req, res, next) => {
       return next(new AppError('You are not a party to this swap request.', 403));
     }
 
-    // Need the creator's stored Google tokens (they're select:false by default).
-    const organizer = await User.findById(req.user._id).select(
-      '+google.refreshToken +google.accessToken +google.expiryDate'
-    );
+    if (swap.status !== SWAP_STATUS.ACCEPTED) {
+      return sendError(res, {
+        statusCode: 400,
+        message: `A meeting can only be created for an accepted swap. Current status: '${swap.status}'.`,
+      });
+    }
 
-    let authClient;
+    // Duplicate prevention: block only while an existing meeting is still
+    // usable ('ready' — created, not yet joined — or 'active' — currently
+    // live). Once Google reports it 'ended', a party is allowed to start a
+    // fresh one ("Start New Meeting").
+    if (swap.meeting?.link && swap.meeting.status !== 'ended') {
+      return sendError(res, {
+        statusCode: 409,
+        message: 'A meeting already exists for this swap.',
+        data: { meeting: swap.meeting },
+      });
+    }
+
+    let meetingData;
     try {
-      authClient = getAuthorizedClientForUser(organizer);
+      meetingData = await createGoogleMeetSpace(req.user._id);
     } catch (err) {
       if (err.code === 'GOOGLE_NOT_CONNECTED') {
         return sendError(res, {
@@ -324,44 +452,79 @@ const createMeeting = async (req, res, next) => {
           errors: { code: 'GOOGLE_NOT_CONNECTED' },
         });
       }
-      throw err;
-    }
-
-    const meetClient = new SpacesServiceClient({ authClient });
-
-    let space;
-    try {
-      [space] = await meetClient.createSpace({});
-    } catch (err) {
-      const reason = err?.details || err?.message || 'Unknown error';
-      return sendError(res, { statusCode: 502, message: `Google Meet rejected the request: ${reason}` });
-    }
-
-    // `space.meetingUri` is Google's real, ready-to-join link — never
-    // constructed or randomized locally.
-    if (!space?.meetingUri) {
       return sendError(res, {
-        statusCode: 502,
-        message: 'Google Meet did not return a meeting URI. Try again.',
+        statusCode: err.statusCode || 502,
+        message: `Google Meet rejected the request: ${err.message}`,
       });
     }
 
-    swap.meeting = {
-      link: space.meetingUri,
-      spaceName: space.name,       // e.g. "spaces/abcd-efgh-ijk" — Meet space id, for reference
-      scheduledAt: startTime,
-      createdBy: req.user._id,
-    };
-    await swap.save();
+    if (startTime) meetingData.scheduledAt = startTime;
 
     const io = req.app.get('io');
-    if (io) io.to(swapId).emit('meetingCreated', swap.meeting);
+    const meeting = await announceMeeting({ swap, meetingData, actorId: req.user._id, io });
 
     return sendSuccess(res, {
       statusCode: 201,
       message: 'Google Meet link created.',
-      data: { meeting: swap.meeting },
+      data: { meeting },
     });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ─── GET /api/swaps/:id/meeting/status — read-only status check ─────────────
+// Read-only: this NEVER creates a space. It only asks Google whether the
+// existing space currently has a live conference (`activeConference`), and
+// updates our own `ready|active|ended` bookkeeping to match reality. Safe to
+// call on chat load / page refresh / periodic polling — it cannot create a
+// duplicate meeting or side-effect anything except that status field.
+const getMeetingStatus = async (req, res, next) => {
+  try {
+    const swap = await SwapRequest.findById(req.params.id);
+    if (!swap) return next(new AppError('Swap request not found.', 404));
+
+    const userId = req.user._id.toString();
+    const isSender = swap.sender.toString() === userId;
+    const isReceiver = swap.receiver.toString() === userId;
+    if (!isSender && !isReceiver) {
+      return next(new AppError('You are not a party to this swap request.', 403));
+    }
+
+    if (!swap.meeting?.spaceName) {
+      return sendSuccess(res, { data: { meeting: null } });
+    }
+
+    // Best-effort: if Google can't be reached right now (expired token,
+    // transient API error), just return the last known status rather than
+    // guessing or failing the whole request.
+    try {
+      const { isActive } = await readGoogleMeetSpaceStatus(
+        swap.meeting.createdBy,
+        swap.meeting.spaceName
+      );
+
+      const wasStatus = swap.meeting.status;
+      if (isActive) {
+        swap.meeting.status = 'active';
+        swap.meeting.everActive = true;
+      } else if (swap.meeting.everActive) {
+        swap.meeting.status = 'ended';
+        if (!swap.meeting.endedAt) swap.meeting.endedAt = new Date();
+      } else {
+        swap.meeting.status = 'ready';
+      }
+
+      if (swap.meeting.status !== wasStatus) {
+        await swap.save();
+        const io = req.app.get('io');
+        if (io) io.to(swap._id.toString()).emit('meeting:status', swap.meeting);
+      }
+    } catch (err) {
+      // Swallow — status endpoint degrades gracefully to last-known state.
+    }
+
+    return sendSuccess(res, { data: { meeting: swap.meeting } });
   } catch (err) {
     next(err);
   }
@@ -374,5 +537,6 @@ module.exports = {
   updateSwapStatus,
   deleteSwapRequest,
   getSwapStats,
-  createMeeting
+  createMeeting,
+  getMeetingStatus,
 };

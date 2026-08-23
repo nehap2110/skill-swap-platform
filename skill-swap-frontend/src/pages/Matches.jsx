@@ -1,166 +1,16 @@
-
 import { useState, useEffect } from 'react'
-import { useAuth } from '../context/AuthContext'
 import api, { extractError } from '../services/api'
-import { skillName, skillId } from '../utils/skillName'
+import { skillName } from '../utils/skillName'
 import Card from '../components/Card'
 import Button from '../components/Button'
 import Badge from '../components/Badge'
 import Avatar from '../components/Avatar'
 import StarRating from '../components/StarRating'
-import Modal from '../components/Modal'
 import ErrorAlert from '../components/ErrorAlert'
 import Empty from '../components/Empty'
 import { SkeletonCard } from '../components/Skeleton'
 import { useToast, ToastContainer } from '../components/Toast'
 import { Link } from 'react-router-dom'
-
-// ─── RequestSwapModal ─────────────────────────────────────────────────────────
-// offeredSkill must be owned by the SENDER (current user)
-// wantedSkill  must be owned by the RECEIVER (target user)
-function RequestSwapModal({ target, onClose, onSuccess }) {
-  const { user }  = useAuth()
-  const userId    = user?._id || user?.id
-
-  // Skills owned by me (to offer)
-  const [mySkills,     setMySkills]     = useState([])
-  // Skills owned by the target (to request)
-  const [theirSkills,  setTheirSkills]  = useState([])
-  const [loadingSkills, setLoadingSkills] = useState(true)
-
-  const [form, setForm]     = useState({ offeredSkillId: '', wantedSkillId: '', message: '' })
-  const [loading, setLoading] = useState(false)
-  const [error, setError]   = useState('')
-
-  useEffect(() => {
-    // Ownership is membership in `skillsOffered` (what the user selected on
-    // their profile via the Skills page) — NOT Skill.createdBy. Both sides
-    // are already populated skill objects on `user` / `target`, so no extra
-    // API call is needed here.
-    setLoadingSkills(true)
-    const mine = (user?.skillsOffered || []).map(s => ({
-      _id:  skillId(s),
-      name: skillName(s),
-    })).filter(s => s._id)
-
-    const theirs = (target?.skillsOffered || []).map(s => ({
-      _id:  skillId(s),
-      name: skillName(s),
-    })).filter(s => s._id)
-
-    setMySkills(mine)
-    setTheirSkills(theirs)
-    setLoadingSkills(false)
-  }, [userId, user, target])
-
-  const submit = async (e) => {
-    e.preventDefault()
-    if (!form.offeredSkillId || !form.wantedSkillId) {
-      setError('Please select both skills.')
-      return
-    }
-    setError('')
-    setLoading(true)
-    try {
-      const targetId = target?.id || target?._id
-      await api.post('/swaps', {
-        receiverId:     String(targetId),
-        offeredSkillId: form.offeredSkillId,
-        wantedSkillId:  form.wantedSkillId,
-        message:        form.message.trim() || undefined,
-      })
-      onSuccess()
-      onClose()
-    } catch (err) {
-      setError(extractError(err))
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const targetName = target?.name || 'this user'
-
-
-  console.log("Current User:", user);
-
-console.log("My Skills:", mySkills);
-
-console.log("Selected Offered Skill:", form.offeredSkillId);
-
-console.log("Target Skills:", theirSkills);
-
-console.log("Selected Wanted Skill:", form.wantedSkillId);
-
-  return (
-    <form onSubmit={submit} className="space-y-4">
-      {/* Target preview */}
-      <div className="flex items-center gap-3 p-3 bg-ink-50 rounded-xl">
-        <Avatar name={target?.name || '?'} src={target?.avatar} size="md" />
-        <div>
-          <p className="font-semibold text-ink-800">{target?.name}</p>
-          {target?.location && <p className="text-xs text-ink-400">📍 {target.location}</p>}
-        </div>
-      </div>
-
-      <ErrorAlert message={error} onDismiss={() => setError('')} />
-
-      {/* Skill I offer (must be mine) */}
-      <div>
-        <label className="label">Skill I'll offer <span className="text-ink-400 font-normal">(must be yours)</span></label>
-        {loadingSkills ? <div className="h-10 shimmer rounded-xl" /> : mySkills.length === 0 ? (
-          <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-700">
-            You have no skills added yet. <Link to="/skills" className="font-semibold underline">Add skills →</Link>
-          </div>
-        ) : (
-          <select required value={form.offeredSkillId}
-            onChange={e => setForm(f => ({ ...f, offeredSkillId: e.target.value }))} className="input">
-            <option value="">Select a skill you offer…</option>
-            {mySkills.map(s => (
-              <option key={s._id || s.id} value={s._id || s.id}>{skillName(s)}</option>
-            ))}
-          </select>
-        )}
-      </div>
-
-      {/* Skill I want (must be theirs) */}
-      <div>
-        <label className="label">Skill I want from {targetName}</label>
-        {loadingSkills ? <div className="h-10 shimmer rounded-xl" /> : theirSkills.length === 0 ? (
-          <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-700">
-            {targetName} has no skills listed.
-          </div>
-        ) : (
-          <select required value={form.wantedSkillId}
-            onChange={e => setForm(f => ({ ...f, wantedSkillId: e.target.value }))} className="input">
-            <option value="">Select a skill they offer…</option>
-            {theirSkills.map(s => {
-              const id  = s._id || s.id || s
-              const nm  = typeof s === 'object' ? skillName(s) : s
-              return <option key={String(id)} value={String(id)}>{nm}</option>
-            })}
-          </select>
-        )}
-      </div>
-
-      {/* Message */}
-      <div>
-        <label className="label">Message <span className="text-ink-400 font-normal">(optional)</span></label>
-        <textarea value={form.message} onChange={e => setForm(f => ({ ...f, message: e.target.value }))}
-          rows={3} maxLength={500}
-          placeholder={`Hi ${targetName}, I'd love to swap skills…`}
-          className="input resize-none" />
-      </div>
-
-      <div className="flex gap-2 pt-1">
-        <Button type="submit" className="flex-1" loading={loading}
-          disabled={!form.offeredSkillId || !form.wantedSkillId || mySkills.length === 0}>
-          Send Request
-        </Button>
-        <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-      </div>
-    </form>
-  )
-}
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 export default function Matches() {
@@ -170,7 +20,10 @@ export default function Matches() {
   const [page, setPage]       = useState(1)
   const [hasMore, setHasMore] = useState(false)
   const [total, setTotal]     = useState(0)
-  const [modal, setModal]     = useState(null)
+  // Tracks in-flight "Send Swap Request" calls per matched user, so each
+  // card shows its own loading/error state instead of a shared modal.
+  const [sendingId, setSendingId] = useState(null)
+  const [sendErrors, setSendErrors] = useState({})
   const { toasts, toast }     = useToast()
 
   const fetchMatches = async (p = 1) => {
@@ -200,21 +53,40 @@ export default function Matches() {
 
   useEffect(() => { fetchMatches(1) }, [])
 
-  const handleSuccess = () => toast('Swap request sent! 🎉')
+  // Send the swap request immediately using the skill pair the matching
+  // algorithm already determined (profile.matchedSkills) — no modal, no
+  // asking the user to pick skills again.
+  const sendRequest = async (profile) => {
+    const targetId = profile?.id || profile?._id
+    const matched   = profile?.matchedSkills || {}
+    setSendErrors(prev => ({ ...prev, [targetId]: '' }))
+
+    if (!matched.offeredSkillId || !matched.wantedSkillId) {
+      setSendErrors(prev => ({
+        ...prev,
+        [targetId]: 'No compatible skill pair found with this user.',
+      }))
+      return
+    }
+
+    setSendingId(targetId)
+    try {
+      await api.post('/swaps', {
+        receiverId:     String(targetId),
+        offeredSkillId: matched.offeredSkillId,
+        wantedSkillId:  matched.wantedSkillId,
+      })
+      toast(`Swap request sent to ${profile.name || 'this user'}! 🎉`)
+    } catch (err) {
+      setSendErrors(prev => ({ ...prev, [targetId]: extractError(err) }))
+    } finally {
+      setSendingId(null)
+    }
+  }
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8 space-y-6 animate-fade-in">
       <ToastContainer toasts={toasts} />
-
-      <Modal open={!!modal} onClose={() => setModal(null)} title="Request a Skill Swap" size="lg">
-        {modal && (
-          <RequestSwapModal
-            target={modal}
-            onClose={() => setModal(null)}
-            onSuccess={handleSuccess}
-          />
-        )}
-      </Modal>
 
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -312,12 +184,28 @@ export default function Matches() {
                     </div>
                   )}
 
+                  {/* Exact skill pair the matching algorithm picked for a request */}
+                  {profile.matchedSkills?.offeredSkillId && profile.matchedSkills?.wantedSkillId && (
+                    <div className="text-xs text-ink-500 bg-ink-50 rounded-xl px-3 py-2">
+                      You offer <span className="font-semibold text-ink-700">{profile.matchedSkills.offeredSkillName}</span>
+                      {' '}for <span className="font-semibold text-ink-700">{profile.matchedSkills.wantedSkillName}</span>
+                    </div>
+                  )}
+
+                  {sendErrors[pid] && (
+                    <ErrorAlert message={sendErrors[pid]} onDismiss={() =>
+                      setSendErrors(prev => ({ ...prev, [pid]: '' }))
+                    } />
+                  )}
+
                   <Button
                     className="w-full mt-auto"
                     size="sm"
-                    onClick={() => setModal(profile)}
+                    loading={sendingId === pid}
+                    disabled={!profile.matchedSkills?.offeredSkillId || !profile.matchedSkills?.wantedSkillId}
+                    onClick={() => sendRequest(profile)}
                   >
-                    Request Swap
+                    Send Swap Request
                   </Button>
                 </Card>
               )

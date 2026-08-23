@@ -30,6 +30,22 @@ const messageSchema = new Schema(
       type: Boolean,
       default: false,
     },
+    // ── Message type ─────────────────────────────────────────────────────────
+    // 'text'    = a normal chat message typed by a user
+    // 'meeting' = a system-generated message announcing a real Google Meet
+    //             link created for this swap (see swap.controller.js)
+    type: {
+      type: String,
+      enum: ['text', 'meeting', 'system'],
+      default: 'text',
+    },
+    // Extra structured data the frontend needs to render non-text messages
+    // (e.g. the real Google Meet URL). Left undefined for plain text messages.
+    meta: {
+      link:      { type: String, default: undefined },
+      meetingId: { type: String, default: undefined },
+      title:     { type: String, default: undefined },
+    },
   },
   { timestamps: true }
 );

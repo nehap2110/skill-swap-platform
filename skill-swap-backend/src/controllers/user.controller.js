@@ -3,6 +3,29 @@ const User = require('../models/User');
 const { AppError } = require('../middleware/errorHandler');
 const { sendSuccess } = require('../utils/apiResponse');
 
+// ─── Helper: determine the specific skill pair for a match ───────────────────
+// The matching algorithm already knows *why* two users matched; this picks the
+// concrete skill-for-skill pair a swap request between `me` and `other` would
+// use, so the frontend never has to ask the user to re-select skills.
+//   offeredSkill = a skill I own that `other` wants (what I'd offer them)
+//   wantedSkill  = a skill `other` owns that I want (what I'd ask them for)
+const buildMatchedSkills = (me, other) => {
+  const idOf = (s) => (s && s._id ? s._id.toString() : s ? s.toString() : null);
+
+  const myWantedIds   = new Set((me.skillsWanted || []).map(idOf));
+  const otherWantedIds = new Set((other.skillsWanted || []).map(idOf));
+
+  const wantedCandidate = (other.skillsOffered || []).find((s) => myWantedIds.has(idOf(s)));
+  const offeredCandidate = (me.skillsOffered || []).find((s) => otherWantedIds.has(idOf(s)));
+
+  return {
+    offeredSkillId:   offeredCandidate ? idOf(offeredCandidate) : null,
+    offeredSkillName: offeredCandidate ? (offeredCandidate.name || offeredCandidate.title || null) : null,
+    wantedSkillId:    wantedCandidate ? idOf(wantedCandidate) : null,
+    wantedSkillName:  wantedCandidate ? (wantedCandidate.name || wantedCandidate.title || null) : null,
+  };
+};
+
 // ─── GET /api/users/:id — public profile ─────────────────────────────────────
 const getUserById = async (req, res, next) => {
   try {
@@ -100,7 +123,9 @@ const deleteMe = async (req, res, next) => {
  */
 const getMatches = async (req, res, next) => {
   try {
-    const me = await User.findById(req.user._id);
+    const me = await User.findById(req.user._id)
+      .populate('skillsOffered', 'name title category level')
+      .populate('skillsWanted',  'name title category level');
     if (!me) return next(new AppError('User not found.', 404));
 
     if (!me.skillsOffered.length && !me.skillsWanted.length) {
@@ -142,7 +167,13 @@ const getMatches = async (req, res, next) => {
 
     return sendSuccess(res, {
       data: {
-        matches: matches.map((u) => u.publicProfile),
+        // Each match already carries the exact skill pair a swap request
+        // would use, computed from the matching data itself — the frontend
+        // does not need (and must not offer) a second skill-selection step.
+        matches: matches.map((u) => ({
+          ...u.publicProfile,
+          matchedSkills: buildMatchedSkills(me, u),
+        })),
 
         pagination: {
           total,

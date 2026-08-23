@@ -13,7 +13,7 @@ const CONTACT_INFO = [
 const FAQ = [
   { q: 'Is SkillSwap completely free?', a: 'Yes! SkillSwap is 100% free. We believe knowledge should flow freely. No subscriptions, no hidden fees — just skills.' },
   { q: 'How does matching work?', a: 'Our algorithm compares what you offer with what others want, and vice versa. When there\'s overlap, you\'re matched and can request a swap.' },
-  { q: 'What if a swap doesn\'t work out?', a: 'Either party can cancel at any time before completion. The review system helps surface any issues and maintain community standards.' },
+  { q: 'What if a swap doesn\'t work out?', a: 'A pending request is decided by the receiver — they can accept or reject it. Once accepted, the receiver can still cancel if needed. The review system helps surface any issues and maintain community standards.' },
   { q: 'Can I swap multiple skills?', a: 'Absolutely. You can list as many skills as you want on your profile and engage in multiple swaps simultaneously.' },
 ]
 

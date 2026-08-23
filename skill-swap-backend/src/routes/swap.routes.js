@@ -9,7 +9,8 @@ const {
   updateSwapStatus,
   deleteSwapRequest,
   getSwapStats,
-  createMeeting
+  createMeeting,
+  getMeetingStatus,
 } = require('../controllers/swap.controller');
 
 const { protect } = require('../middleware/auth.middleware');
@@ -79,7 +80,16 @@ router.patch('/:id/status', updateStatusRules, validate, updateSwapStatus);
 router.delete('/:id', deleteSwapRequest);
 
 //router add to create meeting
-
+// POST body: { swapId, scheduledAt? } — explicit user action only, never
+// triggered by loading the chat/swap/messages or a page refresh.
 router.post('/meeting', protect, createMeeting);
+
+/**
+ * @route  GET /api/swaps/:id/meeting/status
+ * @desc   Read-only check of the real conference state inside an existing
+ *         Meet space (ready|active|ended). Never creates a meeting.
+ * @access Private (swap participants only)
+ */
+router.get('/:id/meeting/status', getMeetingStatus);
 
 module.exports = router;

@@ -118,10 +118,25 @@ const swapRequestSchema = new Schema(
     // (spaces.create — see swap.controller.js#createMeeting). `spaceName` is
     // Google's Meet space identifier (e.g. "spaces/abcd-efgh"), kept for
     // reference only; the Meet API has no scheduling/cancel-event concept.
+    //
+    // `status` tracks the *conference* lifecycle inside the space, which is
+    // distinct from the space itself: a space can exist with nobody in it.
+    //   'ready'  — space created, no one has joined the conference yet
+    //   'active' — Google reports a live conference in this space right now
+    //   'ended'  — a conference was active at some point and is no longer
+    // This is derived from Google's own `Space.activeConference` field (see
+    // getMeetingStatus in swap.controller.js) — never fabricated locally.
     meeting: {
       link:        String,
       spaceName:   String,
       scheduledAt: Date,
+      status: {
+        type: String,
+        enum: ['ready', 'active', 'ended'],
+        default: 'ready',
+      },
+      everActive: { type: Boolean, default: false }, // has Google ever reported this space as active?
+      endedAt:    Date,
       createdBy: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
