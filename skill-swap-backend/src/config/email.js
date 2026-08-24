@@ -1,5 +1,3 @@
-
-
 const nodemailer = require('nodemailer');
 const env        = require('./env');
 
@@ -65,4 +63,23 @@ async function sendEmail({ to, subject, html, text }) {
   return info;
 }
 
-module.exports = { sendEmail };
+/**
+ * One-time, non-blocking SMTP sanity check — call this once at server
+ * startup (see server.js). Never throws: logs a clear, specific reason
+ * (auth failure, connection refused, etc. — via Nodemailer's own `code`)
+ * without ever printing the SMTP password, and never blocks server boot,
+ * since a transient SMTP outage shouldn't take the whole API down.
+ */
+async function verifyEmailConfig() {
+  try {
+    const transport = await getTransport();
+    await transport.verify();
+    console.log('📧  SMTP transporter verified — ready to send email.');
+  } catch (err) {
+    console.error(
+      `📧  SMTP transporter verification failed (${err.code || 'UNKNOWN'}): ${err.message}`
+    );
+  }
+}
+
+module.exports = { sendEmail, verifyEmailConfig };

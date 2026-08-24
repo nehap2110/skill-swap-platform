@@ -127,6 +127,18 @@ const listUserReviewsRules = [
   query('limit').optional().isInt({ min: 1, max: 50 }).withMessage('Limit must be between 1 and 50').toInt(),
 ];
 
+// ─── Contact ──────────────────────────────────────────────────────────────────
+const contactRules = [
+  body('name').trim().notEmpty().withMessage('Name is required')
+    .isLength({ min: 2, max: 100 }).withMessage('Name must be 2–100 characters'),
+  body('email').trim().notEmpty().withMessage('Email is required')
+    .isEmail().withMessage('Please enter a valid email').normalizeEmail(),
+  body('subject').trim().notEmpty().withMessage('Subject is required')
+    .isLength({ max: 150 }).withMessage('Subject cannot exceed 150 characters'),
+  body('message').trim().notEmpty().withMessage('Message is required')
+    .isLength({ max: 2000 }).withMessage('Message cannot exceed 2000 characters'),
+];
+
 // ─── Exports ──────────────────────────────────────────────────────────────────
 module.exports = {
   validate,
@@ -136,4 +148,6 @@ module.exports = {
   sendSwapRules, updateStatusRules, listSwapsRules,
   // review
   createReviewRules, editReviewRules, listUserReviewsRules,
+  // contact
+  contactRules,
 };

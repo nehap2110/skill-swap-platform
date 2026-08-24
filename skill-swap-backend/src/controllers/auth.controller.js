@@ -191,7 +191,7 @@ const forgotPassword = async (req, res, next) => {
       user.passwordResetToken   = undefined;
       user.passwordResetExpires = undefined;
       await user.save({ validateBeforeSave: false });
-      console.error('Email send error:', emailErr.message);
+      console.error(`Email send error (${emailErr.code || 'UNKNOWN'}):`, emailErr.message);
       return sendError(res, {
         statusCode: 500,
         message: 'Failed to send reset email. Please try again later.',

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import Button from '../components/Button'
 import ErrorAlert from '../components/ErrorAlert'
-import api from '../services/api'
+import api, { extractError } from '../services/api'
 
 const CONTACT_INFO = [
   { icon: '📧', label: 'Email', value: 'hello@skillswap.io', href: 'mailto:hello@skillswap.io' },
@@ -29,11 +29,14 @@ export default function Contact() {
     e.preventDefault()
     setError('')
     setLoading(true)
-    // Simulate API call — replace with real endpoint if backend contact route is added
-    await api.post('/contact', form)
-    await new Promise(r => setTimeout(r, 1000))
-    setSubmitted(true)
-    setLoading(false)
+    try {
+      await api.post('/contact', form)
+      setSubmitted(true)
+    } catch (err) {
+      setError(extractError(err))
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (

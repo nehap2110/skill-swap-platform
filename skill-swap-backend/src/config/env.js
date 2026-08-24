@@ -28,6 +28,9 @@ const env = {
   EMAIL_USER:     optional('EMAIL_USER', ''),
   EMAIL_PASS:     optional('EMAIL_PASS', ''),
   EMAIL_FROM:     optional('EMAIL_FROM', '"SkillSwap" <noreply@skillswap.io>'),
+  // Inbox the Contact Us form delivers to. Falls back to EMAIL_USER (the
+  // sending account) so nothing breaks if this isn't set explicitly.
+  CONTACT_EMAIL_TO: optional('CONTACT_EMAIL_TO', ''),
 
   // Password reset
   RESET_TOKEN_EXPIRES_MINUTES: parseInt(optional('RESET_TOKEN_EXPIRES_MINUTES', '15'), 10),

@@ -6,6 +6,7 @@ const env        = require('./src/config/env');
 const connectDB  = require('./src/config/db');
 const app        = require('./src/app');
 const { initSocket } = require('./src/socket');
+const { verifyEmailConfig } = require('./src/config/email');
 
 process.on('uncaughtException', (err) => {
   console.error('Uncaught Exception:', err.name, err.message);
@@ -28,6 +29,11 @@ const start = async () => {
   server.listen(env.PORT, () => {
     console.log(`Server running in ${env.NODE_ENV} mode on port ${env.PORT}`);
   });
+
+  // Fire-and-forget: confirms SMTP is reachable/authenticated at boot so
+  // misconfiguration shows up in the logs immediately instead of only when
+  // the first Contact/forgot-password email is sent. Never blocks startup.
+  verifyEmailConfig();
 
   const shutdown = (signal) => {
     console.log(`\n${signal} received. Shutting down gracefully...`);
